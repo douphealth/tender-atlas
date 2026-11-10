@@ -1,0 +1,3 @@
+import {HttpError} from './http.js';
+export async function sendEmail(env,to,subject,html){if(!env.RESEND_API_KEY||!env.MAIL_FROM)throw new HttpError(503,'Email service not configured');const res=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'content-type':'application/json'},body:JSON.stringify({from:env.MAIL_FROM,to:[to],subject,html})});if(!res.ok){console.error('Email provider failed',res.status);throw new HttpError(502,'Email delivery failed. Retry shortly.');}return true;}
+export function escapeHtml(input){return String(input).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}

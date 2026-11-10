@@ -1,0 +1,21 @@
+name: Quality gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - name: Check secret files are not committed
+        run: |
+          if git ls-files | grep -E '^(.dev.vars|.env|.wrangler/|node_modules/)' ; then exit 1; fi

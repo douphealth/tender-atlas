@@ -1,0 +1,10 @@
+import { cp, rm, mkdir, stat, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+const root = process.cwd();
+for (const f of ['index.html','assets/app.js','assets/styles.css']) await stat(join(root,'public',f));
+const html=await readFile(join(root,'public/index.html'),'utf8');
+if (!html.includes('assets/app.js') || !html.includes('assets/styles.css')) throw new Error('Broken asset references');
+await rm(join(root,'dist'),{recursive:true,force:true});
+await mkdir(join(root,'dist'),{recursive:true});
+await cp(join(root,'public'),join(root,'dist'),{recursive:true});
+console.log('Static Pages build completed: dist/');

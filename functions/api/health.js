@@ -1,0 +1,2 @@
+import {json} from '../_lib/http.js';
+export async function onRequestGet({env}){return json({status:'ok',timestamp:new Date().toISOString(),features:{publicSearch:true,aiMatching:!!env.AI,accounts:!!(env.DB&&env.SESSION_SECRET&&env.RESEND_API_KEY&&env.MAIL_FROM),billing:!!(env.DB&&env.STRIPE_SECRET_KEY&&env.STRIPE_WEBHOOK_SECRET&&env.STRIPE_PRICE_PRO),alerts:!!(env.DB&&env.RESEND_API_KEY&&env.CRON_SECRET)}});}
