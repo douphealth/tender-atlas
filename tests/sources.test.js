@@ -52,7 +52,7 @@ test('UK OCDS scan follows official next-page cursor only, deduplicates and decl
   };
   const result=await searchUk({country:'GBR',days:30,page:1,q:'Cloud'},fetchFn);
   assert.equal(calls,2);assert.equal(result.pagesScanned,2);assert.equal(result.items.length,1);
-  assert.equal(result.exhaustive,true);
+  assert.equal(result.exhaustive,false);
   assert.match(result.coverage,/not exhaustive search/);
 });
 
@@ -74,4 +74,20 @@ test('SAM.gov stays off until a server key exists, never emits credentials in so
   assert.equal(data.items[0].budget,null);
   assert.ok(!JSON.stringify(data).includes('test-only-secret'));
   assert.equal(normalizeSam({noticeId:'abc12345',active:'No'}).status,'archived');
+});
+
+// A release scan may consume all available cursors without representing the entire UK market.
+test('UK release coverage never implies exhaustive national search', async()=>{
+  const {searchUk}=await import('../functions/_lib/sources.js');
+  const fetchFn=async()=>Response.json({releases:[],links:{}});
+  const result=await searchUk({country:'GBR',days:30,page:1,q:''},fetchFn);
+  assert.equal(result.exhaustive,false);
+  assert.match(result.coverage,/not exhaustive search/);
+});
+
+test('TED ISO parser handles date fields embedded in full timestamps and non-date prefixes',async()=>{
+  const {normalizeTed}=await import('../functions/_lib/sources.js');
+  const base={'publication-number':'12345-2026','notice-title':'Public tender','buyer-name':'Authority','buyer-country':'DEU'};
+  const n=normalizeTed({...base,'publication-date':'Published: 2026-11-10','deadline':'2026-12-31T23:59:00Z'});
+  assert.equal(n.published,'2026-11-10');assert.equal(n.deadline,'2026-12-31');
 });

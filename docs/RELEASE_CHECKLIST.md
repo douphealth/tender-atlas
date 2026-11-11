@@ -26,3 +26,11 @@
 21. [ ] Check guest bookmarks, export CSV, copy-search, filter/sort, source error banner and desktop/mobile keyboard accessibility.
 22. [ ] Check CSP: no inline JS is required and market breakdown uses native `<progress>` elements instead of CSP-blocked inline styles.
 23. [ ] Never present test or screenshot fixtures as real notices. Live network source tests and Stripe payment tests must be run separately.
+
+## v2.2 interface and source checks
+
+24. [ ] Open live preview in desktop and 390px mobile viewport; verify real notices appear without horizontal overflow and the mobile filter drawer works.
+25. [ ] Ensure every chart and evidence bar renders under the strict `style-src 'self'` CSP (no inline styles).
+26. [ ] Confirm decision desk uses actual future-deadline notices or transparent local profile scores, never invented tenders or eligibility statements.
+27. [ ] Verify UK feed stops within its latency budget, reports truncated coverage, and never discards previously fetched pages when a subsequent page times out.
+28. [ ] Confirm main remains available and existing D1, Stripe or email runtime settings are not modified by this visual/data release.

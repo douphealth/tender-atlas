@@ -11,6 +11,8 @@ const UK_URL = 'https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackag
 const SAM_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SOURCE_TIMEOUT_MS = 10000;
 const UK_SCAN_PAGES = 3;
+const UK_TOTAL_BUDGET_MS = 9000;
+const UK_PAGE_TIMEOUT_MS = 4500;
 const PAGE_SIZE = 20;
 const COUNTRY_NAMES = {
   GRC:'Greece',DEU:'Germany',FRA:'France',ITA:'Italy',ESP:'Spain',PRT:'Portugal',
@@ -56,7 +58,7 @@ function iso(v){
   const s=first(v);
   if(!s)return null;
   const m=String(s).match(/(?:^|[^\d])(\d{4})-(\d{2})-(\d{2})(?!\d)/);
-  const date=m?m[0]:/^\d{8}$/.test(s)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:null;
+  const date=m?`${m[1]}-${m[2]}-${m[3]}`:/^\d{8}$/.test(s)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:null;
   if(!date)return null;
   const d=new Date(date+'T00:00:00Z');
   return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===date?date:null;
@@ -78,8 +80,8 @@ const utcDateToUs=s=>{const [y,m,d]=s.split('-');return `${m}/${d}/${y}`;};
 function deadlineState(d,cancelled=false){return cancelled?'cancelled':d&&d<today()?'expired':d?'deadline-listed':'unverified';}
 function sourceLink(url,hostname){try{let p=new URL(url);return p.protocol==='https:'&&(p.hostname===hostname||p.hostname.endsWith('.'+hostname))?p.href:null;}catch{return null;}}
 
-async function remote(url,init={},fetchFn=fetch){
-  const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),SOURCE_TIMEOUT_MS);
+async function remote(url,init={},fetchFn=fetch,timeoutMs=SOURCE_TIMEOUT_MS){
+  const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),timeoutMs);
   try{
     const r=await fetchFn(url,{...init,signal:ctl.signal,headers:{accept:'application/json',...(init.headers||{})}});
     if(!r.ok)throw new HttpError(502,`Official source returned HTTP ${r.status}`);
@@ -184,9 +186,14 @@ export async function searchUk(p,fetchFn=fetch){
   // A bounded scan keeps cost predictable and makes incomplete coverage explicit.
   // UK cursor links may point to older releases; never follow off-domain URLs.
   let next=`${UK_URL}?updatedFrom=${encodeURIComponent(daysAgo(Math.min(p.days,30))+'T00:00:00')}&limit=50`;
-  const seen=new Map();let scanned=0,hasMore=false;
+  const seen=new Map();let scanned=0,hasMore=false,interrupted=false;
+  const start=Date.now();
   while(next&&scanned<(p.q?UK_SCAN_PAGES:2)&&seen.size<40){
-    const r=await remote(next,{},fetchFn);
+    const remaining=UK_TOTAL_BUDGET_MS-(Date.now()-start);
+    if(remaining<400){interrupted=true;break;}
+    let r;
+    try{r=await remote(next,{},fetchFn,Math.min(remaining,UK_PAGE_TIMEOUT_MS));}
+    catch(e){if(scanned===0)throw e;interrupted=true;break;}
     if(!Array.isArray(r.releases))throw new HttpError(502,'UK source returned an unexpected format');
     scanned++;
     for(const record of r.releases){
@@ -201,8 +208,8 @@ export async function searchUk(p,fetchFn=fetch){
   hasMore=Boolean(next);
   // UK is a recent-release scan, not arbitrary-result pagination.
   return {items:[...seen.values()],total:null,pagesScanned:scanned,
-    coverage:`Latest ${scanned} UK release page${scanned===1?'':'s'} scanned; ${hasMore?'more releases exist':'pagination ended'}; not exhaustive search`,
-    nextPage:false,exhaustive:!hasMore};
+    coverage:`Latest ${scanned} UK release page${scanned===1?'':'s'} scanned; ${interrupted?'scan stopped after reaching source latency budget':hasMore?'more releases exist':'pagination ended'}; not exhaustive search`,
+    nextPage:false,exhaustive:false};
 }
 
 export function normalizeSam(n){

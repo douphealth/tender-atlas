@@ -1,5 +1,18 @@
 # TenderAtlas — Source-backed procurement intelligence
 
+## Release v2.2 — decision-first dashboard and bounded source latency
+
+- Compact enterprise research workspace with dense, readable result cards; exact official publisher links and transparent status badges.
+- Mobile-first collapsed advanced filters, usable keyword search, four live sample metrics and accessible source-coverage diagnostics.
+- Data-derived decision desk with upcoming published deadlines or relevance ranking based on the user's locally stored business profile; never presents these as winning probabilities or verified eligibility.
+- Market intelligence includes published-date trends, country/source distribution, completeness and top buyer authorities measured only on retrieved notices.
+- UI bar visuals use predeclared CSS proportion classes rather than inline styles, preserving the strict Cloudflare Pages CSP.
+- UK ingestion uses bounded source time budgets and retains already fetched records if a later cursor times out; coverage is always labeled as partial.
+- Date extraction handles prefixed publisher date strings. Free guest workspace, CSV export and saved pipeline stages remain functional without external credentials.
+
+**Release gate:** automated tests and local browser smoke are required before any `main` merge. The live Cloudflare preview must still validate source parsing and upstream response times. The site does not claim that D1, AI, email or Stripe are enabled until their configured bindings and keys are detected.
+
+
 **Deployment-ready Cloudflare Pages project** with a live multi-source procurement directory, account security, company relevance profiles, saved notices, opt-in email alerts, and server-verified Stripe subscription entitlements. No seeded or fabricated procurement listings.
 
 > **Status:** The application, database schema, endpoints and mocked E2E integration tests have been implemented and built. The upstream APIs, live emails, Cloudflare Pages runtime, actual Stripe transactions and final mobile UI rendering have **not** been tested against deployed accounts. Do not accept real payments until staging verification and publication of appropriate privacy/terms documents.
@@ -148,7 +161,7 @@ Source schema and API examples are tested using deterministic mocked upstream re
 - ΚΗΜΔΗΣ: https://cerpp.eprocurement.gov.gr/khmdhs-opendata/help
 - UK Find a Tender: https://www.find-tender.service.gov.uk/Developer/Documentation
 
-**Coverage honesty:** TED searches `cn-standard` contract notices published within the selected interval and does not cover every tender notice variant. ΚΗΜΔΗΣ may return canceled/amended notices, which are explicitly labeled. The UK adapter reads a limited recent OCDS page and keyword-filters that page locally, so it must never be marketed as complete UK coverage. US SAM.gov is not implemented in this package. Publication and deadline dates may change; always use the original authority as source of truth.
+**Coverage honesty:** TED searches selected competitive notice types but is not an exhaustive procurement index or legal determination of openness. ΚΗΜΔΗΣ may contain cancelled/amended notices, which remain labeled. UK returns a bounded subset of recently updated OCDS releases and local keyword matches rather than full-market search. SAM.gov is opt-in only when `SAM_API_KEY` is provided; without it, the US feed is disabled. Verify all deadlines and eligibility at the originating authority.
 
 ## Privacy, safety, and operational requirements
 

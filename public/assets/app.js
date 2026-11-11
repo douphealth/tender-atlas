@@ -1,4 +1,5 @@
 import {deadlineCategory,visibleItems,upcomingWithin,makeCsv,marketsInView} from './insights.js';
+import {summarizeEvidence,publicationSeries,topBuyers,readStages,pipelineCounts,normalizeLocalProfile,PIPELINE_STAGES} from './workbench.js';
 const ICONS={
  compass:'<circle cx="12" cy="12" r="9"/><path d="m15.6 8.4-2.4 4.8-4.8 2.4 2.4-4.8z"/>',
  bookmark:'<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4-7 4z"/>',
@@ -30,7 +31,7 @@ const $=sel=>document.querySelector(sel),$$=sel=>[...document.querySelectorAll(s
 function icon(name){return `<span class="svg-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[name]||ICONS.info}</svg></span>`;}
 function icons(root=document){root.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[el.dataset.icon]||ICONS.info}</svg>`;});}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state={view:'discover',session:null,profile:null,items:[],saved:[],alerts:[],sourceMeta:[],partial:false,searching:false,searchSeq:0,page:1,lang:localStorage.getItem('ta:lang')==='el'?'el':'en',health:null,aiResults:{},guestSaved:[],features:{},sourceErrors:[],queriedAt:null,searchAbort:null};
+const state={view:'discover',session:null,profile:null,localProfile:null,pipelineStages:{},density:'comfortable',items:[],saved:[],alerts:[],sourceMeta:[],partial:false,searching:false,searchSeq:0,page:1,lang:localStorage.getItem('ta:lang')==='el'?'el':'en',health:null,aiResults:{},guestSaved:[],features:{},sourceErrors:[],queriedAt:null,searchAbort:null};
 const text={en:{discover:'Discover',saved:'Saved opportunities',alerts:'Smart alerts',workspace:'Company profile',billing:'Plans & billing',search:'Explore tenders',noResults:'No notices match the current filters.',fail:'Official source search could not complete.',signin:'Sign in',signout:'Sign out',savedok:'Opportunity saved.',savedremove:'Removed from shortlist.',verify:'Verify official deadline',open:'Open official notice'},el:{discover:'Αναζήτηση',saved:'Αποθηκευμένα',alerts:'Ειδοποιήσεις',workspace:'Προφίλ εταιρείας',billing:'Πλάνα & πληρωμές',search:'Αναζήτηση έργων',noResults:'Δεν βρέθηκαν αποτελέσματα με αυτά τα φίλτρα.',fail:'Δεν ήταν δυνατή η σύνδεση με τις επίσημες πηγές.',signin:'Σύνδεση',signout:'Αποσύνδεση',savedok:'Η ευκαιρία αποθηκεύτηκε.',savedremove:'Αφαιρέθηκε από τη λίστα.',verify:'Επιβεβαίωση προθεσμίας',open:'Επίσημη προκήρυξη'}};
 const t=k=>text[state.lang][k]||k;
 let toastTimer;
@@ -41,15 +42,67 @@ const euroFmt=(v,currency)=>{if(!Number.isFinite(Number(v))||v==null)return 'Not
 const safeUrl=url=>{try{const u=new URL(url);return u.protocol==='https:'?u.href:'#';}catch{return '#';}};
 const savedIds=()=>new Set(state.saved.map(x=>x.noticeId));
 const localSaveKey='ta:guestSaved:v1';
+const localProfileKey='ta:guestProfile:v2';
+const stageKey='ta:pipelineStages:v2';
+const densityKey='ta:density:v2';
 function readGuestSaved(){try{const x=JSON.parse(localStorage.getItem(localSaveKey)||'[]');return Array.isArray(x)?x.filter(r=>r&&typeof r.noticeId==='string'&&typeof r.sourceUrl==='string').slice(0,60):[];}catch{return [];}}
 function persistGuestSaved(){try{localStorage.setItem(localSaveKey,JSON.stringify(state.guestSaved.slice(0,60)));}catch(e){toast('Browser storage is full. Saved opportunities may not persist on this device.',true);}}
-function currentViewItems(){return visibleItems(state.items,{status:$('#filter-status')?.value||'all',sort:$('#filter-sort')?.value||'recent',scoreFn:state.profile?calculateMatch:null});}
+function currentViewItems(){const filtered=state.items.filter(n=>!$('#filter-valued')?.checked||(n.budget!=null&&Number.isFinite(Number(n.budget))));return visibleItems(filtered,{status:$('#filter-status')?.value||'all',sort:$('#filter-sort')?.value||'recent',scoreFn:state.profile?calculateMatch:null});}
+function percentClass(p){return `pct-${Math.max(0,Math.min(100,Math.round(p/5)*5))}`;}
+function completenessMarkup(items){
+ const ev=summarizeEvidence(items);const entries=[['Deadline reported',ev.deadlines],['Value disclosed',ev.values],['CPV classified',ev.cpv]];
+ return entries.map(([label,value])=>`<div class="completeness-row"><div class="completeness-heading"><span>${label}</span><strong>${ev.total?ev.ratio(value)+'%':'—'}</strong></div><div class="completeness-bar"><div class="completeness-fill ${percentClass(ev.ratio(value))}"></div></div></div>`).join('');
+}
+function renderIntelligence(){
+ const items=state.items,ev=summarizeEvidence(items),stats=[['Retrieved records',items.length,'From current query'],['Markets',ev.markets,'In returned records'],['Deadlines provided',ev.total?`${ev.ratio(ev.deadlines)}%`:'—','Not proof bids are open'],['Feeds responding',state.sourceMeta.length,'Of sources attempted']];
+ $('#insight-kpis').innerHTML=stats.map(([label,value,caption])=>`<div class="insight-kpi"><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(caption)}</em></div>`).join('');
+ const markets=marketsInView(items).slice(0,8),max=Math.max(1,...markets.map(x=>x.total));
+ $('#insight-markets').innerHTML=markets.length?markets.map(m=>`<div class="insight-bar-entry"><span title="${esc(m.name)}">${esc(m.name)}</span><div class="bar-track" role="img" aria-label="${esc(m.name)}: ${m.total} records"><span class="${percentClass(100*m.total/max)}"></span></div><strong>${m.total}</strong></div>`).join(''):empty('No market sample yet','Search for notices before analyzing market distribution.','globe');
+ const names={ted:'European Union · TED',khmdhs:'Greece · ΚΗΜΔΗΣ',uk:'United Kingdom · Find a Tender',sam:'United States · SAM.gov'};
+ const good=state.sourceMeta.map(m=>`<div class="insight-source"><div class="insight-source-top"><strong>${esc(names[m.source]||m.source)}</strong><span>${Number(m.count||0)} fetched</span></div><small>${esc(m.coverage||'Source replied')} · ${Number(m.pagesScanned||1)} page(s) scanned</small></div>`).join('');
+ const errors=state.sourceErrors.map(e=>`<div class="insight-source"><div class="insight-source-top"><strong>${esc(names[e.source]||e.source)}</strong><span class="failed">Unavailable</span></div><small>${esc(e.reason)}</small></div>`).join('');
+ $('#insight-sources').innerHTML=good+errors||'<div class="muted">Search a market to inspect live source responses.</div>';
+ const pub=publicationSeries(items,7),peak=Math.max(1,...pub.map(b=>b.count));
+ $('#insight-trend').innerHTML=pub.map(d=>`<div class="trend-col"><div class="trend-track"><div class="trend-bar ${percentClass(100*d.count/peak)}"></div></div><strong>${d.count}</strong><small>${esc(d.date.slice(5))}</small></div>`).join('');
+ $('#insight-quality').innerHTML='<p class="rail-explainer">Fraction of retrieved records with these publisher-supplied fields. Missing values remain unknown.</p>'+completenessMarkup(items)+'<p class="rail-explainer insight-quality-note">Source publication dates are not proof a tender is currently open. Look for amendments and official closing times.</p>';
+ renderBuyers();
+}
+function renderBuyers(){
+ const buyers=topBuyers(state.items,7);
+ const max=Math.max(1,...buyers.map(x=>x.count));
+ $('#insight-buyers').innerHTML=buyers.length?buyers.map((b,i)=>`<div class="buyer-rank"><span class="buyer-index">${String(i+1).padStart(2,'0')}</span><div class="buyer-data"><strong>${esc(b.name)}</strong><div class="buyer-track"><span class="${percentClass(b.count/max*100)}"></span></div></div><b>${b.count}</b></div>`).join(''):empty('No authority names in this sample','Buyer names will appear after you retrieve suitable notices.','building');
+}
+function readLocalProfile(){try{return normalizeLocalProfile(JSON.parse(localStorage.getItem(localProfileKey)||'null'));}catch{return null;}}
+function saveLocalProfile(profile){try{localStorage.setItem(localProfileKey,JSON.stringify(profile));return true;}catch{return false;}}
+function readLocalStages(){try{return readStages(JSON.parse(localStorage.getItem(stageKey)||'{}'));}catch{return {};}}
+function persistStages(){try{localStorage.setItem(stageKey,JSON.stringify(state.pipelineStages));return true;}catch{return false;}}
+function renderFocusHighlights(){
+  const el=$('#focus-highlights');if(!el)return;
+  const now=new Date().toISOString().slice(0,10);
+  const candidates=state.items.filter(n=>n.deadline&&n.deadline>=now&&n.status!=='cancelled'&&n.status!=='archived').sort((a,b)=>{
+    if(state.profile){const difference=(calculateMatch(b)?.score||0)-(calculateMatch(a)?.score||0);if(difference)return difference;}
+    return a.deadline.localeCompare(b.deadline);
+  }).slice(0,3);
+  $('#decision-explainer').textContent=state.profile?'Matches ranked by your saved criteria; bidding eligibility must be checked.':'Notices with future deadlines in the current retrieved sample, not a claim they are open for bidding.';
+  el.innerHTML=candidates.length?candidates.map((n,i)=>{
+    const match=state.profile?calculateMatch(n):null;
+    const note=match?`${match.score}/100 profile relevance`:`${dateFmt(n.deadline)} deadline`;
+    return `<a class="focus-item" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer"><span class="focus-num">${String(i+1).padStart(2,'0')}</span><span class="focus-copy"><strong>${esc(n.title)}</strong><small>${esc(n.countryName||n.country||'Source market')} · ${esc(note)}</small></span>${icon('arrow')}</a>`;
+  }).join(''):`<div class="focus-empty">${state.items.length?'No future deadlines were reported in this sample.':'Search official notices to see evidence-backed candidates here.'}</div>`;
+}
 function updateViewIndicators(){
   const list=currentViewItems();
   $('#stat-count').textContent=String(list.length);
   $('#stat-countries').textContent=String(new Set(list.map(x=>x.country).filter(Boolean)).size);
   $('#stat-sources').textContent=String(state.sourceMeta.length);
   $('#stat-upcoming').textContent=String(upcomingWithin(list));
+  $('#pulse-total').textContent=String(state.items.length);
+  $('#pulse-markets').textContent=String(new Set(state.items.map(n=>n.country).filter(Boolean)).size);
+  $('#pulse-feeds').textContent=String(state.sourceMeta.length);
+  $('#pulse-checked').textContent=state.queriedAt?`Retrieved ${dateFmt(state.queriedAt)}`:'Awaiting first search';
+  $('#completeness-meters').innerHTML=completenessMarkup(list);
+  const context=$('#feed-context-description');if(context)context.textContent=`${state.items.length} retrieved from ${state.sourceMeta.length} responding source${state.sourceMeta.length===1?'':'s'} · not an exhaustive global index`;
+  $('#results').classList.toggle('compact',state.density==='compact');
   $('#result-count').textContent=`(${list.length} in this view)`;
   const sorted=marketsInView(list),max=Math.max(...sorted.map(x=>x.total),1);
   $('#market-breakdown').innerHTML=sorted.length?sorted.slice(0,7).map(x=>`<div class="market-item"><div class="market-item-header"><span>${esc(x.name)}</span><span>${x.total}</span></div><div class="market-track"><progress value="${x.total}" max="${max}" aria-label="${esc(x.name)}: ${x.total}"></progress></div></div>`).join(''):'<span class="muted">No market data in this view.</span>';
@@ -71,38 +124,43 @@ function renderResults(){
   const date=state.queriedAt?new Date(state.queriedAt):null;
   $('#source-coverage').innerHTML=ok+failed+(ok||failed?`<p class="muted">Checked ${date&&Number.isFinite(date.getTime())?esc(date.toLocaleString(state.lang==='el'?'el-GR':'en-GB')):'just now'}. These counts are not global totals.</p>`:'<p class="muted">No source responded.</p>');
   $('#saved-count').textContent=String(state.saved.length);
+  renderFocusHighlights();
+  renderIntelligence();
 }
 function showSourceErrors(errors,partial){const notices=$('#source-notices');if(!errors?.length){notices.innerHTML='';return;}notices.innerHTML=`<div class="notice-strip">${icon('alert')} <span>${partial?'Partial results.':'Search unavailable.'} ${errors.map(e=>`${esc(e.source)}: ${esc(e.reason)}`).join(' · ')}. No substitute records were invented.</span></div>`;}
 async function loadSearch(reset=true){
   if(state.searching&&!reset)return;
+  if(state.searchAbort)state.searchAbort.abort();
+  const controller=new AbortController();state.searchAbort=controller;
   const seq=++state.searchSeq;
   if(reset){state.page=1;state.items=[];state.sourceMeta=[];state.sourceErrors=[];}
   state.searching=true;
-  $('#results').innerHTML=`<div class="loading-placeholder"><span class="spinner"></span> Consulting official procurement registers…</div>`;
-  $('#more-results').hidden=true;
+  if(reset){$('#results').innerHTML=`<div class="loading-placeholder"><span class="spinner"></span> Consulting official procurement registers…</div>`;$('#more-results').hidden=true;}
+  else{$('#more-results').disabled=true;$('#more-results').textContent='Loading next page…';}
   const params=new URLSearchParams({source:$('#filter-source').value,country:$('#filter-country').value,days:$('#filter-days').value,q:$('#query-input').value.trim(),page:String(state.page)});
   const share=new URL(location.href);share.search='';share.searchParams.set('q',params.get('q'));share.searchParams.set('source',params.get('source'));share.searchParams.set('country',params.get('country'));share.searchParams.set('days',params.get('days'));
   history.replaceState(null,'',share.pathname+'?'+share.searchParams.toString());
   try{
-    const data=await api('/api/search?'+params);
+    const data=await api('/api/search?'+params,{signal:controller.signal});
     if(seq!==state.searchSeq)return;
     if(!Array.isArray(data.items))throw Error('Official search returned invalid data');
     state.items=reset?data.items:[...state.items,...data.items.filter(n=>!state.items.some(x=>x.id===n.id))];
-    state.sourceMeta=data.sourceMeta||[];state.sourceErrors=data.sourceErrors||[];state.queriedAt=data.queriedAt||null;
+    state.sourceMeta=(data.sourceMeta||[]).map(m=>({...m,count:state.items.filter(n=>n.source===m.source).length}));state.sourceErrors=data.sourceErrors||[];state.queriedAt=data.queriedAt||null;
     showSourceErrors(data.sourceErrors,data.partial);
     if(!data.sourceMeta?.length&&!data.sourceErrors?.length&&data.coverage){$('#source-notices').innerHTML=`<div class="notice-strip info">${esc(data.coverage)}. ${esc(data.disclaimer||'')}</div>`;}
     renderResults();
-    $('#more-results').hidden=!($('#filter-source').value!=='all'&&data.sourceMeta?.some(m=>m.nextPage));
+    $('#more-results').hidden=!data.sourceMeta?.some(m=>m.nextPage);
   }catch(e){
     if(seq!==state.searchSeq)return;
+    if(e.name==='AbortError')return;
     state.sourceMeta=[];state.sourceErrors=[];state.queriedAt=null;
     $('#results').innerHTML=empty(t('fail'),e.message,'alert');$('#source-notices').innerHTML='';
     $('#source-state').classList.add('error-state');$('#source-state').innerHTML='<span class="pulse-dot"></span> Feed unavailable';
     $('#stat-count').textContent='—';$('#stat-sources').textContent='0';$('#stat-countries').textContent='—';$('#stat-upcoming').textContent='—';
     toast(e.message,true);
-  }finally{if(seq===state.searchSeq)state.searching=false;}
+  }finally{if(seq===state.searchSeq){state.searching=false;state.searchAbort=null;$('#more-results').disabled=false;$('#more-results').innerHTML=`Load next page ${icon('arrow')}`;}}
 }
-function showView(view,scroll=true){if(!['discover','saved','alerts','workspace','billing'].includes(view))view='discover';state.view=view;$$('.page-view').forEach(el=>el.classList.toggle('active',el.id===`view-${view}`));$$('[data-view]').forEach(el=>{el.classList.toggle('active',el.dataset.view===view);if(el.tagName==='BUTTON')el.setAttribute('aria-current',el.dataset.view===view?'page':'false');});$('#breadcrumb-view').textContent=t(view);if(scroll)scrollTo({top:0,behavior:'smooth'});history.replaceState(null,'',view==='discover'?'/':`/?view=${encodeURIComponent(view)}`);if(view==='saved')renderSaved();if(view==='alerts')renderAlerts();if(view==='billing')loadBilling();}
+function showView(view,scroll=true){if(!['discover','intelligence','saved','alerts','workspace','billing'].includes(view))view='discover';state.view=view;$$('.page-view').forEach(el=>el.classList.toggle('active',el.id===`view-${view}`));$$('[data-view]').forEach(el=>{el.classList.toggle('active',el.dataset.view===view);if(el.tagName==='BUTTON')el.setAttribute('aria-current',el.dataset.view===view?'page':'false');});$('#breadcrumb-view').textContent=t(view);if(scroll)scrollTo({top:0,behavior:'smooth'});const u=new URL(location.href);if(view==='discover')u.searchParams.delete('view');else u.searchParams.set('view',view);history.replaceState(null,'',u.pathname+u.search);if(view==='saved')renderSaved();if(view==='intelligence')renderIntelligence();if(view==='alerts')renderAlerts();if(view==='billing')loadBilling();}
 const GREEK_UI={
   '.hero h1':'Δημόσιοι διαγωνισμοί.<br><em>Με καθαρές πληροφορίες.</em>',
   '.hero-sub':'Ένας ενιαίος χώρος για να ανακαλύπτεις και να αξιολογείς δημόσιες προκηρύξεις από επίσημες ευρωπαϊκές πηγές.',
@@ -144,7 +202,7 @@ const GREEK_UI={
 };
 const originalUi=new Map();
 function translateUi(){for(const [selector,greek] of Object.entries(GREEK_UI)){const el=$(selector);if(!el)continue;if(!originalUi.has(selector))originalUi.set(selector,selector==='#query-input'?el.placeholder:el.innerHTML);if(selector==='#query-input')el.placeholder=state.lang==='el'?greek:originalUi.get(selector);else if(greek)el.innerHTML=state.lang==='el'?greek:originalUi.get(selector);}}
-function applyLanguage(){document.documentElement.lang=state.lang;translateUi();$('#language-toggle').textContent=state.lang==='en'?'EL':'EN';const labels={'.nav-link[data-view="discover"] span:last-child':t('discover'),'.nav-link[data-view="alerts"] span:last-child':t('alerts'),'.nav-link[data-view="workspace"] span:last-child':t('workspace')};for(const [sel,value] of Object.entries(labels)){const el=$(sel);if(el)el.textContent=value;}$('#breadcrumb-view').textContent=t(state.view);if(state.items.length)renderResults();}
+function applyLanguage(){document.documentElement.lang=state.lang;translateUi();$('#language-toggle').textContent=state.lang==='en'?'EL':'EN';const labels={'.nav-link[data-view="intelligence"] span:last-child':state.lang==='el'?'Ανάλυση αγορών':'Market intelligence','.nav-link[data-view="discover"] span:last-child':t('discover'),'.nav-link[data-view="alerts"] span:last-child':t('alerts'),'.nav-link[data-view="workspace"] span:last-child':t('workspace')};for(const [sel,value] of Object.entries(labels)){const el=$(sel);if(el)el.textContent=value;}$('#breadcrumb-view').textContent=t(state.view);if(state.items.length)renderResults();}
 async function loadAccount(){
   try{
     const data=await api('/api/auth/me');state.session=data.authenticated?data:null;
@@ -153,21 +211,25 @@ async function loadAccount(){
       await Promise.allSettled([loadSaved(),loadAlerts(),loadProfile()]);
     }else{
       $('#sign-in-btn').innerHTML=state.health&&!state.features.accounts?`Guest workspace ${icon('bookmark')}`:`${t('signin')} ${icon('arrow')}`;
-      state.saved=state.guestSaved;state.alerts=[];state.profile=null;
+      state.saved=state.guestSaved;state.alerts=[];state.profile=state.localProfile;
     }
-  }catch(e){console.warn('Account service unavailable:',e.message);state.session=null;state.saved=state.guestSaved;}
+  }catch(e){console.warn('Account service unavailable:',e.message);state.session=null;state.saved=state.guestSaved;state.profile=state.localProfile;}
   $('#saved-count').textContent=String(state.saved.length);
-  if(state.view==='saved')renderSaved();if(state.view==='alerts')renderAlerts();if(state.view==='workspace')showProfile();
+  if(state.view==='saved')renderSaved();if(state.view==='alerts')renderAlerts();if(state.view==='workspace')showProfile();if(state.view==='intelligence')renderIntelligence();
 }
 async function loadSaved(){const res=await api('/api/account/watchlist');state.saved=res.items;$('#saved-count').textContent=String(res.items.length);}
 async function loadAlerts(){const res=await api('/api/alerts');state.alerts=res.items;}
 async function loadProfile(){const res=await api('/api/account/profile');state.profile=res.profile;showProfile();}
-function showProfile(){const p=state.profile;if(!p)return;$('#profile-name').value=p.name||'';$('#profile-description').value=p.description||'';$('#profile-keywords').value=(p.keywords||[]).join(', ');$('#profile-cpvs').value=(p.cpvCodes||[]).join(', ');$('#profile-countries').value=(p.countries||[]).join(', ');}
+function showProfile(){const p=state.profile;$('#profile-storage-note').textContent=state.session?'Signed-in profile: stored in your account when server storage is configured.':'Device-only profile: stored in this browser. Clearing browser data removes it. No account or email required.';if(!p)return;$('#profile-name').value=p.name||'';$('#profile-description').value=p.description||'';$('#profile-keywords').value=(p.keywords||[]).join(', ');$('#profile-cpvs').value=(p.cpvCodes||[]).join(', ');$('#profile-countries').value=(p.countries||[]).join(', ');}
 function renderSaved(){
-  const el=$('#saved-content');
-  const note=!state.session?'<div class="guest-note">Saved on this device only. Configure D1 + email authentication for secure cross-device synchronization. Clearing browser data will remove these local bookmarks.</div>':'';
-  if(!state.saved.length){el.innerHTML=note+empty('Your shortlist starts here','Explore official sources and bookmark an opportunity. You can save locally without an account.','bookmark');return;}
-  el.innerHTML=note+`<div class="saved-grid">${state.saved.map(s=>`<div class="saved-card"><small>${esc(s.source)} · ${esc(dateFmt(s.notice?.published))}</small><strong>${esc(s.title)}</strong><a href="${esc(safeUrl(s.sourceUrl))}" target="_blank" rel="noopener noreferrer">Open official publication ${icon('external')}</a><button data-remove="${esc(s.noticeId)}">Remove</button></div>`).join('')}</div>`;
+  const el=$('#saved-content'),counts=pipelineCounts(state.saved,state.pipelineStages);
+  const filter=$('#saved-stage-filter').value;
+  const items=state.saved.filter(n=>filter==='all'||(state.pipelineStages[n.noticeId]||'review')===filter);
+  $('#saved-pipeline-count').textContent=`${items.length} shown · ${counts.all} saved`;
+  const note='<div class="guest-note">Pipeline stages are stored in this browser only, including when you sign in. A saved item links to its original publisher; use the official documents to validate every condition.</div>';
+  if(!items.length){el.innerHTML=note+empty(counts.all?'No notices in this stage':'Your shortlist starts here',counts.all?'Change the stage filter to see other opportunities.':'Explore official sources and bookmark an opportunity. You can save locally without an account.','bookmark');return;}
+  const stageOpts=[['review','To review'],['qualified','Qualified'],['bid','Preparing bid'],['pass','Passed']];
+  el.innerHTML=note+`<div class="saved-grid">${items.map(s=>{const stage=state.pipelineStages[s.noticeId]||'review';return `<div class="saved-card"><small>${esc(s.source)} · ${esc(dateFmt(s.notice?.published))}</small><strong>${esc(s.title)}</strong><a href="${esc(safeUrl(s.sourceUrl))}" target="_blank" rel="noopener noreferrer">View original publication ${icon('external')}</a><div class="saved-stage-row"><label>Decision stage <select data-stage-id="${esc(s.noticeId)}" aria-label="Pipeline stage for saved opportunity">${stageOpts.map(([key,label])=>`<option value="${key}" ${stage===key?'selected':''}>${label}</option>`).join('')}</select></label><button data-remove="${esc(s.noticeId)}" type="button">Remove</button></div></div>`;}).join('')}</div>`;
 }
 function renderAlerts(){const el=$('#alerts-content');if(!state.session){el.innerHTML=empty('Email alerts are not yet active',state.health&&!state.features.alerts?'The owner must configure D1, Resend and scheduled delivery first.':'Sign in to save alerts and receive email.','bell');return;}if(!state.alerts.length){el.innerHTML=empty('No alerts configured','Choose a search term and create your first monitoring rule.','bell');return;}el.innerHTML=`<div class="alert-list">${state.alerts.map(a=>`<div class="alert-item"><strong>${esc(a.term)}</strong><small>${esc(a.country||'All markets')} · ${esc(a.source)} · ${a.last_checked_at?'Checked '+esc(new Date(a.last_checked_at*1000).toLocaleDateString()):'Waiting for scheduled delivery'}</small><button data-delete-alert="${esc(a.id)}">Delete</button></div>`).join('')}</div>`;}
 function openNoticeDialog(id){
@@ -216,7 +278,15 @@ async function handleSave(id){
 async function loadBilling(){if(!state.session){$('#billing-status').textContent='Sign in to view your subscription.';return;}try{const b=await api('/api/billing/status');$('#billing-status').textContent=`Current tier: ${b.tier.toUpperCase()} · Billing status: ${b.status}${b.billingConfigured?'':' · Stripe configuration pending'}`;}catch(e){$('#billing-status').textContent=e.message;}}
 async function startCheckout(tier){if(state.health&&!state.features.billing)return toast('Payments are not active. The subscription plans are not available for purchase yet.');if(tier==='free')return toast('The free plan is available without payment.');if(!state.session){openLogin();return;}try{const res=await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({tier})});location.assign(res.url);}catch(e){toast(e.message,true);}}
 function bind(){icons();
-  $('#filter-status').addEventListener('change',renderResults);
+  const mobileFilterButton=$('#toggle-filters');const filterForm=$('#filters');
+  mobileFilterButton.addEventListener('click',()=>{const open=filterForm.classList.toggle('filters-open');mobileFilterButton.setAttribute('aria-expanded',String(open));mobileFilterButton.classList.toggle('active',open);});
+
+  $('#density-toggle').addEventListener('click',()=>{state.density=state.density==='compact'?'comfortable':'compact';try{localStorage.setItem(densityKey,state.density);}catch{}$('#density-toggle').setAttribute('aria-pressed',String(state.density==='compact'));$('#density-toggle').textContent=state.density==='compact'?'Comfortable rows':'Compact rows';renderResults();});
+  $('#filter-valued').addEventListener('change',renderResults);
+  $('#open-intelligence').addEventListener('click',()=>showView('intelligence'));
+  $('#saved-stage-filter').addEventListener('change',renderSaved);
+  document.addEventListener('change',e=>{const selector=e.target.closest('[data-stage-id]');if(!selector)return;const id=selector.dataset.stageId;if(!PIPELINE_STAGES.includes(selector.value))return;state.pipelineStages[id]=selector.value;persistStages();renderSaved();toast('Stage saved on this device.');});
+    $('#filter-status').addEventListener('change',renderResults);
   $('#filter-sort').addEventListener('change',renderResults);
   $('#export-results').addEventListener('click',exportResults);
   $('#copy-search').addEventListener('click',copySearch);
@@ -224,10 +294,10 @@ function bind(){icons();
   $$('#quick-searches button').forEach(btn=>btn.addEventListener('click',()=>{
     $('#query-input').value=btn.dataset.quick;$$('#quick-searches button').forEach(b=>b.classList.toggle('active',b===btn));loadSearch();
   }));
-  $$('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));$$('[data-action="open-plans"]').forEach(el=>el.addEventListener('click',()=>showView('billing')));$('#language-toggle').addEventListener('click',()=>{state.lang=state.lang==='en'?'el':'en';localStorage.setItem('ta:lang',state.lang);applyLanguage();});$('#sign-in-btn').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{await api('/api/auth/logout',{method:'POST',body:'{}'});await loadAccount();showView('discover');toast('Signed out securely.');}catch(e){toast(e.message,true);}});$('#close-login').addEventListener('click',()=>$('#login-dialog').close());$('#login-dialog').addEventListener('click',e=>{if(e.target.id==='login-dialog')e.target.close();});$('#hero-search').addEventListener('submit',e=>{e.preventDefault();showView('discover',false);loadSearch();});$('#filters').addEventListener('submit',e=>{e.preventDefault();loadSearch();});$('#refresh-btn').addEventListener('click',()=>loadSearch());$('#clear-filters').addEventListener('click',()=>{$('#query-input').value='';$('#filter-source').value='all';$('#filter-country').value='';$('#filter-days').value='30';$('#filter-status').value='all';$('#filter-sort').value='recent';$$('#quick-searches button').forEach(b=>b.classList.remove('active'));loadSearch();});$('#more-results').addEventListener('click',()=>{state.page++;loadSearch(false);});document.addEventListener('click',e=>{const detail=e.target.closest('[data-detail]');if(detail){openNoticeDialog(detail.dataset.detail);return;}const ai=e.target.closest('[data-ai]');if(ai){handleAi(ai.dataset.ai);return;}const save=e.target.closest('[data-save]');if(save){handleSave(save.dataset.save);return;}const rem=e.target.closest('[data-remove]');if(rem){handleSave(rem.dataset.remove);return;}const del=e.target.closest('[data-delete-alert]');if(del){(async()=>{try{await api('/api/alerts',{method:'DELETE',body:JSON.stringify({id:del.dataset.deleteAlert})});await loadAlerts();renderAlerts();toast('Alert deleted.');}catch(e){toast(e.message,true);}})();return;}const tier=e.target.closest('[data-tier]');if(tier)startCheckout(tier.dataset.tier);});$('#email-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#email-form button');el.disabled=true;try{const r=await api('/api/auth/request',{method:'POST',body:JSON.stringify({email:$('#login-email').value.trim()})});state.challengeId=r.challengeId;$('#email-form').hidden=true;$('#verify-form').hidden=false;$('#auth-feedback').textContent='A 6-digit code has been sent. It expires in 10 minutes.';$('#login-code').focus();}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#verify-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#verify-form button[type=submit]');el.disabled=true;try{await api('/api/auth/verify',{method:'POST',body:JSON.stringify({challengeId:state.challengeId,code:$('#login-code').value.trim()})});$('#login-dialog').close();await loadAccount();toast('Signed in. Your workspace is ready.');}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#change-email').addEventListener('click',()=>{$('#verify-form').hidden=true;$('#email-form').hidden=false;$('#auth-feedback').textContent='';});$('#profile-form').addEventListener('submit',async e=>{e.preventDefault();if(!state.session){openLogin();return;}const csv=id=>$(id).value.split(',').map(x=>x.trim()).filter(Boolean);const profile={name:$('#profile-name').value.trim(),description:$('#profile-description').value.trim(),keywords:csv('#profile-keywords'),cpvCodes:csv('#profile-cpvs'),countries:csv('#profile-countries').map(x=>x.toUpperCase())};try{await api('/api/account/profile',{method:'PUT',body:JSON.stringify(profile)});await loadProfile();toast('Company profile saved. Matching signals updated.');}catch(e){toast(e.message,true);}});$('#alert-form').addEventListener('submit',async e=>{e.preventDefault();if(!state.session){openLogin();return;}try{await api('/api/alerts',{method:'POST',body:JSON.stringify({term:$('#alert-term').value,country:$('#alert-country').value,source:$('#alert-source').value})});await loadAlerts();renderAlerts();$('#alert-term').value='';toast('Alert created. Delivery begins when the scheduler is configured.');}catch(e){toast(e.message,true);}});$('#manage-billing').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{const r=await api('/api/billing/portal',{method:'POST',body:'{}'});location.assign(r.url);}catch(e){toast(e.message,true);}});}
+  $$('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));$$('[data-action="open-plans"]').forEach(el=>el.addEventListener('click',()=>showView('billing')));$('#language-toggle').addEventListener('click',()=>{state.lang=state.lang==='en'?'el':'en';localStorage.setItem('ta:lang',state.lang);applyLanguage();});$('#sign-in-btn').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{await api('/api/auth/logout',{method:'POST',body:'{}'});await loadAccount();showView('discover');toast('Signed out securely.');}catch(e){toast(e.message,true);}});$('#close-login').addEventListener('click',()=>$('#login-dialog').close());$('#login-dialog').addEventListener('click',e=>{if(e.target.id==='login-dialog')e.target.close();});$('#hero-search').addEventListener('submit',e=>{e.preventDefault();showView('discover',false);loadSearch();});$('#filters').addEventListener('submit',e=>{e.preventDefault();filterForm.classList.remove('filters-open');mobileFilterButton.setAttribute('aria-expanded','false');mobileFilterButton.classList.remove('active');loadSearch();});$('#refresh-btn').addEventListener('click',()=>loadSearch());$('#clear-filters').addEventListener('click',()=>{$('#query-input').value='';$('#filter-source').value='all';$('#filter-country').value='';$('#filter-days').value='30';$('#filter-status').value='all';$('#filter-sort').value='recent';$$('#quick-searches button').forEach(b=>b.classList.remove('active'));loadSearch();});$('#more-results').addEventListener('click',()=>{state.page++;loadSearch(false);});document.addEventListener('click',e=>{const detail=e.target.closest('[data-detail]');if(detail){openNoticeDialog(detail.dataset.detail);return;}const ai=e.target.closest('[data-ai]');if(ai){handleAi(ai.dataset.ai);return;}const save=e.target.closest('[data-save]');if(save){handleSave(save.dataset.save);return;}const rem=e.target.closest('[data-remove]');if(rem){handleSave(rem.dataset.remove);return;}const del=e.target.closest('[data-delete-alert]');if(del){(async()=>{try{await api('/api/alerts',{method:'DELETE',body:JSON.stringify({id:del.dataset.deleteAlert})});await loadAlerts();renderAlerts();toast('Alert deleted.');}catch(e){toast(e.message,true);}})();return;}const tier=e.target.closest('[data-tier]');if(tier)startCheckout(tier.dataset.tier);});$('#email-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#email-form button');el.disabled=true;try{const r=await api('/api/auth/request',{method:'POST',body:JSON.stringify({email:$('#login-email').value.trim()})});state.challengeId=r.challengeId;$('#email-form').hidden=true;$('#verify-form').hidden=false;$('#auth-feedback').textContent='A 6-digit code has been sent. It expires in 10 minutes.';$('#login-code').focus();}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#verify-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#verify-form button[type=submit]');el.disabled=true;try{await api('/api/auth/verify',{method:'POST',body:JSON.stringify({challengeId:state.challengeId,code:$('#login-code').value.trim()})});$('#login-dialog').close();await loadAccount();toast('Signed in. Your workspace is ready.');}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#change-email').addEventListener('click',()=>{$('#verify-form').hidden=true;$('#email-form').hidden=false;$('#auth-feedback').textContent='';});$('#profile-form').addEventListener('submit',async e=>{e.preventDefault();const csv=id=>$(id).value.split(',').map(x=>x.trim()).filter(Boolean);const profile=normalizeLocalProfile({name:$('#profile-name').value.trim(),description:$('#profile-description').value.trim(),keywords:csv('#profile-keywords'),cpvCodes:csv('#profile-cpvs'),countries:csv('#profile-countries').map(x=>x.toUpperCase())});if(!profile||!profile.name){toast('Enter a company name and at least one search criterion.',true);return;}if(!state.session){if(!saveLocalProfile(profile)){toast('Browser storage is unavailable; profile was not saved.',true);return;}state.localProfile=profile;state.profile=profile;showProfile();renderResults();toast('Matching profile saved on this device.');return;}try{await api('/api/account/profile',{method:'PUT',body:JSON.stringify(profile)});await loadProfile();renderResults();toast('Company profile saved. Matching signals updated.');}catch(e){toast(e.message,true);}});$('#alert-form').addEventListener('submit',async e=>{e.preventDefault();if(!state.session){openLogin();return;}try{await api('/api/alerts',{method:'POST',body:JSON.stringify({term:$('#alert-term').value,country:$('#alert-country').value,source:$('#alert-source').value})});await loadAlerts();renderAlerts();$('#alert-term').value='';toast('Alert created. Delivery begins when the scheduler is configured.');}catch(e){toast(e.message,true);}});$('#manage-billing').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{const r=await api('/api/billing/portal',{method:'POST',body:'{}'});location.assign(r.url);}catch(e){toast(e.message,true);}});}
 (async function init(){
-  state.guestSaved=readGuestSaved();state.saved=state.guestSaved;
-  bind();applyLanguage();
+  state.guestSaved=readGuestSaved();state.saved=state.guestSaved;state.localProfile=readLocalProfile();state.profile=state.localProfile;state.pipelineStages=readLocalStages();state.density=localStorage.getItem(densityKey)==='compact'?'compact':'comfortable';
+  bind();applyLanguage();showProfile();$('#density-toggle').setAttribute('aria-pressed',String(state.density==='compact'));$('#density-toggle').textContent=state.density==='compact'?'Comfortable rows':'Compact rows';
   const qp=new URLSearchParams(location.search);
   if(qp.get('q'))$('#query-input').value=qp.get('q').slice(0,80);
   if(['all','ted','khmdhs','uk','sam'].includes(qp.get('source')))$('#filter-source').value=qp.get('source');
