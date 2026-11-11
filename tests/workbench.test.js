@@ -28,7 +28,8 @@ test('source-derived dashboard markup remains strict-CSP compatible', async()=>{
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
   assert.equal(/\bstyle\s*=/.test(app),false,'Inline styles are blocked by the production CSP');
-  assert.match(html,/atlas-atelier\.css/);
+  assert.match(html,/atlas-v3\.css/);
+  assert.doesNotMatch(html,/atlas-atelier\.css|atlas-workbench\.css/);
   assert.match(html,/id="focus-highlights"/);
   assert.match(html,/id="toggle-filters"/);
 });

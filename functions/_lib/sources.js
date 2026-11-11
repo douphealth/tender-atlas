@@ -12,6 +12,7 @@ const SAM_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SOURCE_TIMEOUT_MS = 10000;
 const UK_SCAN_PAGES = 3;
 const UK_TOTAL_BUDGET_MS = 9000;
+const UK_BROAD_SEARCH_BUDGET_MS = 3400;
 const UK_PAGE_TIMEOUT_MS = 4500;
 const PAGE_SIZE = 20;
 const COUNTRY_NAMES = {
@@ -187,9 +188,12 @@ export async function searchUk(p,fetchFn=fetch){
   // UK cursor links may point to older releases; never follow off-domain URLs.
   let next=`${UK_URL}?updatedFrom=${encodeURIComponent(daysAgo(Math.min(p.days,30))+'T00:00:00')}&limit=50`;
   const seen=new Map();let scanned=0,hasMore=false,interrupted=false;
+  const targeted=p.source==='uk'||p.country==='GBR';
+  const budgetMs=targeted?UK_TOTAL_BUDGET_MS:UK_BROAD_SEARCH_BUDGET_MS;
+  const maxPages=targeted?(p.q?UK_SCAN_PAGES:2):1;
   const start=Date.now();
-  while(next&&scanned<(p.q?UK_SCAN_PAGES:2)&&seen.size<40){
-    const remaining=UK_TOTAL_BUDGET_MS-(Date.now()-start);
+  while(next&&scanned<maxPages&&seen.size<40){
+    const remaining=budgetMs-(Date.now()-start);
     if(remaining<400){interrupted=true;break;}
     let r;
     try{r=await remote(next,{},fetchFn,Math.min(remaining,UK_PAGE_TIMEOUT_MS));}
@@ -208,7 +212,7 @@ export async function searchUk(p,fetchFn=fetch){
   hasMore=Boolean(next);
   // UK is a recent-release scan, not arbitrary-result pagination.
   return {items:[...seen.values()],total:null,pagesScanned:scanned,
-    coverage:`Latest ${scanned} UK release page${scanned===1?'':'s'} scanned; ${interrupted?'scan stopped after reaching source latency budget':hasMore?'more releases exist':'pagination ended'}; not exhaustive search`,
+    coverage:`Latest ${scanned} UK release page${scanned===1?'':'s'} scanned; ${interrupted?'scan stopped after reaching source latency budget':hasMore?'more releases exist':'pagination ended'}; ${targeted?'targeted source scan':'fast broad discovery sample'}; not exhaustive search`,
     nextPage:false,exhaustive:false};
 }
 
@@ -256,17 +260,21 @@ export async function searchSources(input,fetchFn=fetch,options={}){
   if(!selected.length)return {items:[],sourceMeta:[],sourceErrors:[],partial:false,shown:0,queriedAt:new Date().toISOString(),
     coverage:'No enabled official feed for this market',disclaimer:'SAM.gov US search requires a configured API key.'};
   const map={ted:searchTed,khmdhs:searchKhmdhs,uk:searchUk,sam:(args,ff)=>searchSam(args,ff,options.samApiKey)};
-  const settled=await Promise.allSettled(selected.map(s=>map[s](p,fetchFn)));
+  const settled=await Promise.allSettled(selected.map(async(source)=>{
+    const started=Date.now();
+    try {return {data:await map[source](p,fetchFn),durationMs:Math.max(0,Date.now()-started)};}
+    catch(error){error.sourceDurationMs=Math.max(0,Date.now()-started);throw error;}
+  }));
   const sourceErrors=[],sourceMeta=[],items=[];
   settled.forEach((r,i)=>{
     const source=selected[i];
     if(r.status==='fulfilled'){
-      items.push(...r.value.items);
-      sourceMeta.push({source,count:r.value.items.length,total:r.value.total,coverage:r.value.coverage,
-        nextPage:r.value.nextPage,pagesScanned:r.value.pagesScanned||1,exhaustive:r.value.exhaustive===true});
+      items.push(...r.value.data.items);
+      sourceMeta.push({source,count:r.value.data.items.length,total:r.value.data.total,coverage:r.value.data.coverage,
+        nextPage:r.value.data.nextPage,pagesScanned:r.value.data.pagesScanned||1,exhaustive:r.value.data.exhaustive===true,durationMs:r.value.durationMs});
     }else{
       const reason=r.reason instanceof HttpError?r.reason.message:'Source temporarily unavailable';
-      sourceErrors.push({source,reason});
+      sourceErrors.push({source,reason,durationMs:r.reason?.sourceDurationMs??null});
     }
   });
   if(settled.every(r=>r.status==='rejected'))throw new HttpError(502,'All official sources are currently unavailable');

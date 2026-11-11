@@ -1,27 +1,27 @@
 
-body{margin:0;background:#f5f7f7;color:#19343c}*{box-sizing:border-box}
-.doc-nav{height:73px;background:#0b1f2b;color:#f9ffff;display:flex;align-items:center;justify-content:space-between;padding:0 max(22px,calc((100vw - 1060px)/2));gap:20px}
-.doc-brand{font-weight:850;font-size:20px;letter-spacing:-.04em;color:#fff;text-decoration:none}.doc-brand span{color:#cef79c}
-.doc-nav>a:last-child{font-size:12px;font-weight:700;color:#c4f3c2;text-decoration:none}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#f6f8fd;color:#293853}*{box-sizing:border-box}
+.doc-nav{height:73px;background:#151b33;color:#f9ffff;display:flex;align-items:center;justify-content:space-between;padding:0 max(22px,calc((100vw - 1060px)/2));gap:20px}
+.doc-brand{font-weight:850;font-size:20px;letter-spacing:-.04em;color:#fff;text-decoration:none}.doc-brand span{color:#b5aeff}
+.doc-nav>a:last-child{font-size:12px;font-weight:700;color:#c6c0ff;text-decoration:none}
 .doc-shell{max-width:1060px;margin:auto;padding:63px 23px 90px}
-.doc-kicker{font-size:10px;font-weight:850;letter-spacing:.18em;color:#408469}
-.doc-hero{background:linear-gradient(115deg,#102e39,#0d1928);color:white;padding:48px clamp(25px,5vw,65px);border-radius:25px;box-shadow:0 20px 40px rgba(16,37,50,.1)}
+.doc-kicker{font-size:10px;font-weight:850;letter-spacing:.18em;color:#655be0}
+.doc-hero{background:linear-gradient(115deg,#171c3f,#27245f);color:white;padding:48px clamp(25px,5vw,65px);border-radius:25px;box-shadow:0 20px 40px rgba(16,37,50,.1)}
 .doc-hero h1{font-size:clamp(36px,5vw,60px);font-weight:750;letter-spacing:-.055em;line-height:1.12;margin:16px 0}
-.doc-hero h1 em{font-family:Georgia,serif;font-weight:500;font-style:italic;color:#d2f6a7}
+.doc-hero h1 em{font-family:Georgia,serif;font-weight:500;font-style:italic;color:#c4beff}
 .doc-hero p{color:#b6c9ca;font-size:14px;line-height:1.8;max-width:670px}
 .doc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;margin:25px 0 45px}
-.doc-card{background:#fff;border:1px solid #dce8e8;border-radius:18px;padding:25px 27px;box-shadow:0 5px 20px rgba(17,46,55,.026)}
-.doc-card h2{font-size:19px;letter-spacing:-.03em;margin:0 0 11px;color:#193641}
-.doc-card p,.doc-card li{font-size:12px;line-height:1.7;color:#536b75}
-.doc-card a{font-size:11px;color:#207b58;font-weight:800;text-decoration:underline;text-underline-offset:3px}
-.doc-number{font-size:10px;color:#598d75;font-weight:850;letter-spacing:.13em;margin-bottom:13px}
-.doc-article{background:#fff;border:1px solid #dce8e8;border-radius:18px;padding:31px 35px;margin-top:16px}
+.doc-card{background:#fff;border:1px solid #e2e6f1;border-radius:18px;padding:25px 27px;box-shadow:0 5px 20px rgba(17,46,55,.026)}
+.doc-card h2{font-size:19px;letter-spacing:-.03em;margin:0 0 11px;color:#273353}
+.doc-card p,.doc-card li{font-size:12px;line-height:1.7;color:#728198}
+.doc-card a{font-size:11px;color:#6157d0;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.doc-number{font-size:10px;color:#655be0;font-weight:850;letter-spacing:.13em;margin-bottom:13px}
+.doc-article{background:#fff;border:1px solid #e2e6f1;border-radius:18px;padding:31px 35px;margin-top:16px}
 .doc-article h2{font-size:24px;letter-spacing:-.04em;margin:0 0 11px}
 .doc-article h3{font-size:15px;margin:23px 0 8px}
-.doc-article p,.doc-article li{line-height:1.8;font-size:13px;color:#526c73}
-.doc-article a{color:#137750;text-decoration:underline;text-underline-offset:3px}
+.doc-article p,.doc-article li{line-height:1.8;font-size:13px;color:#71819a}
+.doc-article a{color:#6157d0;text-decoration:underline;text-underline-offset:3px}
 .doc-article ul{padding-left:23px}
-.doc-warning{border:1px solid #cfddd4;border-radius:13px;background:#eff8f1;padding:16px 19px;color:#375d4e;font-size:12px;line-height:1.7;margin-top:19px}
+.doc-warning{border:1px solid #e1ddff;border-radius:13px;background:#f2f0ff;padding:16px 19px;color:#625baa;font-size:12px;line-height:1.7;margin-top:19px}
 .doc-foot{font-size:11px;color:#80959b;padding-top:27px}
 @media(max-width:720px){.doc-nav{padding:0 21px}.doc-shell{padding:25px 14px 55px}.doc-hero{padding:34px 25px}.doc-grid{grid-template-columns:1fr;gap:11px}.doc-card{padding:22px}.doc-article{padding:24px}}
 

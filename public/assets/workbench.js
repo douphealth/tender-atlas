@@ -44,3 +44,39 @@ export function normalizeLocalProfile(input){
   if(!name&&!description&&!keywords.length&&!cpvCodes.length&&!countries.length)return null;
   return {name,description,keywords,cpvCodes,countries};
 }
+
+/**
+ * Conservative, explainable relevance evidence from publisher fields.
+ * Fixed weights deliberately prevent a country-only match from scoring 100/100.
+ * Not an eligibility test, award prediction or AI-generated requirement assessment.
+ */
+export function scoreRelevance(notice, profile) {
+  if (!notice || !profile) return null;
+  const keywords = [...new Set((profile.keywords||[]).filter(x=>typeof x==='string')
+    .map(x=>x.trim().toLocaleLowerCase()).filter(x=>x.length>2))].slice(0,20);
+  const cpvs = (profile.cpvCodes||[]).filter(x=>/^\d{8}$/.test(x)).slice(0,20);
+  const markets = (profile.countries||[]).filter(x=>/^[A-Z]{3}$/.test(x));
+  if (!keywords.length && !cpvs.length && !markets.length) return null;
+  const description = `${notice.title||''} ${notice.buyer||''}`.toLocaleLowerCase();
+  const matchedKeywords = keywords.filter(k=>description.includes(k));
+  const noticeCpvs = Array.isArray(notice.cpv)?notice.cpv:[];
+  const exactCpv = cpvs.some(c=>noticeCpvs.includes(c));
+  const familyCpv = !exactCpv&&cpvs.some(c=>noticeCpvs.some(n=>/^\d{8}$/.test(n)&&c.slice(0,5)===n.slice(0,5)));
+  const marketMatch = markets.includes(notice.country);
+  let score = 0;const reasons=[];
+  if(matchedKeywords.length){score+=Math.min(45,45*matchedKeywords.length/Math.min(Math.max(1,keywords.length),4));reasons.push(`Keywords: ${matchedKeywords.slice(0,2).join(', ')}`);}
+  if(exactCpv){score+=35;reasons.push('Exact CPV match');}
+  else if(familyCpv){score+=20;reasons.push('Related CPV family');}
+  if(markets.length&&marketMatch){score+=20;reasons.push('Target market');}
+  const rounded=Math.max(0,Math.min(100,Math.round(score)));
+  return {score:rounded,reasons:reasons.join(' · ')||'No direct matches in the available source fields',
+    evidence:{keywords:matchedKeywords.length,cpv:exactCpv?'exact':familyCpv?'related':'none',market:marketMatch},
+    note:'Source-field relevance only; bidding eligibility and current status are unverified.'};
+}
+
+export function daysToListedDeadline(notice,today=new Date().toISOString().slice(0,10)){
+  const deadline=notice?.deadline;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline||'')||!/^\d{4}-\d{2}-\d{2}$/.test(today))return null;
+  const date=Date.parse(deadline+'T00:00:00Z'),now=Date.parse(today+'T00:00:00Z');
+  return Number.isFinite(date)&&Number.isFinite(now)?Math.round((date-now)/86400000):null;
+}

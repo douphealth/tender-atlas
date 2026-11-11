@@ -91,3 +91,12 @@ test('TED ISO parser handles date fields embedded in full timestamps and non-dat
   const n=normalizeTed({...base,'publication-date':'Published: 2026-11-10','deadline':'2026-12-31T23:59:00Z'});
   assert.equal(n.published,'2026-11-10');assert.equal(n.deadline,'2026-12-31');
 });
+
+test('public source responses include observed durations and never invent coverage',async()=>{
+ const fake=async u=>u.includes('ted.europa')?Response.json({notices:[fakeTed],totalNoticeCount:1}):Response.json(u.includes('khmdhs')?{content:[],last:true,totalElements:0}:{releases:[],links:{}});
+ const res=await searchSources({source:'all',days:30},fake);
+ assert.equal(res.sourceMeta.length,3);
+ assert.ok(res.sourceMeta.every(s=>Number.isFinite(s.durationMs)&&s.durationMs>=0));
+ assert.ok(res.sourceMeta.some(s=>s.source==='uk'&&/not exhaustive/.test(s.coverage)));
+ assert.equal(res.shown,1);
+});

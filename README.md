@@ -1,3 +1,19 @@
+# TenderAtlas v3.0 — Official procurement research workbench
+
+## Release v3.0 — production-focused interface and evidence quality
+
+- Redesigned the full responsive research experience with a unified interface, keyboard search (`Ctrl/⌘ + K`), compact mobile discovery and immediate source-backed results.
+- Reduced loaded UI stylesheets from four to two (`styles.css` + `atlas-v3.css`), with no external fonts or image dependencies; methodology has its own lightweight stylesheet.
+- Added transparent **conservative relevance evidence** based on actual title/buyer keywords, exact or related CPV classification and explicit target markets. A country-only match is capped at 20/100. A score is **not eligibility or award probability**.
+- Added a working **Relevant to me** filter for users who save a free local company profile, and days until the **listed** source deadline (never asserts bidding is still open).
+- Source response timing is measured per feed; a broad cross-market query gives the slow UK source a bounded latency budget, while targeted UK searches get more time and pagination.
+- The production code never ships mocked opportunities, false review metrics or simulated source availability.
+- Main release gate: run `npm run check`, validate Cloudflare preview and live official APIs, then merge the audited PR into `main` and verify production. The existing production commit is the rollback point.
+
+**Production prerequisites not inferred or auto-configured:** Cloudflare D1 binding, verified email/Resend, optional Workers AI and Stripe price IDs + signing secrets. Until these are genuinely configured, the interface does not represent paid, alert or AI features as operational.
+
+---
+
 # TenderAtlas — Source-backed procurement intelligence
 
 ## Release v2.2 — decision-first dashboard and bounded source latency

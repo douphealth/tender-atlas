@@ -1,3 +1,19 @@
+# TenderAtlas 3.0 release acceptance
+
+- [x] Official data adapters kept; no sample tenders packaged in production UI.
+- [x] Explainable deterministic relevance; no inflated score from a country-only profile.
+- [x] Search keyboard shortcut, filters, details dialog, saved notice, guest profile and relevance filter browser QA.
+- [x] Responsive 390px / 768px / 1440px checked without JS errors or horizontal overflow in a simulated browser fixture.
+- [x] Local Node tests and production `npm run build` pass.
+- [ ] Verify official TED/ΚΗΜΔΗΣ/UK API responses in live Cloudflare deployment.
+- [ ] Verify GitHub CI + Cloudflare Pages preview deployment for the new head SHA.
+- [ ] Verify production `main` deployment after explicit release merge.
+- [ ] Enable D1/Resend/Stripe only with correctly provisioned bindings/secrets and test purchase lifecycle.
+
+Note: simulated browser fixtures are not production records. Source and payment validations are release-blocking when their functionality is advertised as live.
+
+---
+
 # Staging → Production acceptance gates
 
 1. [ ] GitHub staging PR CI completed successfully and Cloudflare Pages build succeeded (no startup failure).
