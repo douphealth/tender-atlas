@@ -4,23 +4,50 @@
 
 > **Status:** The application, database schema, endpoints and mocked E2E integration tests have been implemented and built. The upstream APIs, live emails, Cloudflare Pages runtime, actual Stripe transactions and final mobile UI rendering have **not** been tested against deployed accounts. Do not accept real payments until staging verification and publication of appropriate privacy/terms documents.
 
+
+## Product-quality upgrade (v1.1, staging branch)
+
+This release improves the **actual product**, not just its colors:
+
+- Premium, responsive editorial dashboard with a redesigned explorer, source coverage cards, in-view deadline filters, result sorting, sector shortcuts, and detailed notice dialogs.
+- **Working guest shortlist** saved only on the current device (capped at 60 records). Sign-in and cross-device storage continue to require D1 + Resend. No fake account sync.
+- **CSV export** of real fetched notices, with spreadsheet formula-injection protections, and shareable filtered search URLs.
+- Corrected Greek CPV parsing when the official `cpvs[].key` contains the numeric code and `cpvs[].value` contains the translated label. Original ADAM notice PDFs now link directly to the publisher's attachment endpoint.
+- TED search covers selected published competitive notice categories (standard, social, design, qualification, prior information calls for competition). It does **not** assert a record is legally open or available to every bidder.
+- UK Find a Tender follows safe official OCDS pagination with a **bounded scan**: up to two recent pages without a keyword, up to three pages when searching keywords. It is not a complete keyword index; the interface discloses that explicitly.
+- Optional US **SAM.gov Get Opportunities v2** adapter. Requires a server-side `SAM_API_KEY`; no user-facing US search claim or API-key exposure before it is configured.
+- Source response transparency, errors, dates, publisher provenance and localized CPV categories. The data methodology is linked from `/methodology.html`.
+- Data source, URL, input, source-failure, safety, spreadsheet export, match and subscription tests are run with `npm run check`.
+
+**Deployment observations:** The Cloudflare Pages project `tender-atlas` currently has no production D1 or Workers AI binding and no runtime secrets. Accordingly, real logins, email alerts, AI, US-only search and Stripe payments are **not enabled in production**. Do not describe them as currently live or sell subscriptions before completing provider configuration and end-to-end test-mode checks.
+
+**Local test:** `npm run check`. **Pages settings:** `npm run build` → `dist`. Do not deploy `public/` as the production output directory.
+
+**SAM.gov enablement (optional):**
+1. Obtain an API key from your own SAM.gov account (see the official [Get Opportunities Public API](https://open.gsa.gov/api/get-opportunities-public-api/) docs).
+2. Add `SAM_API_KEY` as an **encrypted Cloudflare Pages runtime secret**, never as a GitHub variable or frontend code.
+3. Redeploy and inspect `/api/health` (`features.samGov: true`). Search `?source=sam&country=USA&days=30`, inspect notices against SAM.gov and API quotas before advertising US coverage.
+4. The SAM.gov direct UI link can require elevated access; if unavailable, the app sends users to the official search portal with the original notice reference.
+
+**Safe rollout / rollback:** Merge a reviewed, green PR only after confirming the Pages preview serves the app and the existing official-source search. If production behaves unexpectedly, use Cloudflare Pages → Deployments → Rollback to the previous successful production deployment, then revert the merge commit (or reverse the squash commit) in GitHub. Do not migrate production D1 or enable live Stripe as part of a visual release.
+
 ## What is working in source code
 
 | Capability | Status / deployment dependency |
 |---|---|
-| TED Search API v3 | Implemented, no API key, runtime connection required |
-| ΚΗΜΔΗΣ Open Data API | Implemented, no API key, runtime connection required |
-| Find a Tender OCDS | Implemented, fetches latest release page only; **not** exhaustive UK keyword search |
-| Search, filters, pagination, partial-source errors | Implemented; page 1 for combined search; per-source TED/Greek pagination |
+| TED Search API v3 | Extended competitive types; no API key, upstream runtime verification required |
+| ΚΗΜΔΗΣ Open Data API | Improved CPV mapping + ADAM PDF links; no API key, upstream runtime verification required |
+| Find a Tender OCDS | Bounded pagination (1–3 recent release pages); **not** exhaustive UK keyword search |
+| Search, filters, pagination, partial-source errors | Implemented; in-view status/sort; per-source TED/Greek/SAM pagination; UK scan is bounded |
 | Detailed official provenance and deadline confidence | Implemented, original publisher always linked |
 | Passwordless email sign-in | Implemented; requires D1 + Resend + SESSION_SECRET |
-| Persistent company profiles and watchlists | Implemented; requires D1 and signed-in user |
+| Persistent company profiles and watchlists | Cross-device accounts require D1; anonymous users can save locally on their device |
 | Transparent keyword / CPV / country relevance | Implemented, heuristic only; does **not** verify eligibility |
 | Semantic match via BGE-M3 | Implemented; requires Workers AI binding and active paid subscription; quotas enforced |
 | Opt-in search alerts + daily digest scheduler | Implemented; requires D1 + Resend + CRON_SECRET + GitHub Actions secrets |
 | Stripe checkout / portal / verified webhooks | Implemented; requires Stripe products, API secrets and test-mode verification |
-| SAM.gov, other world datasets | **Not connected**; outside launch coverage |
-| SEO-first individual indexed tender detail pages | **Not implemented**; public landing is indexable, listings render client-side |
+| SAM.gov (USA) | Adapter implemented; **disabled** until Cloudflare secret `SAM_API_KEY` is supplied |
+| SEO-first individual indexed tender detail pages | **Not implemented**; only the landing/methodology are indexable; no mass-generated thin listings |
 
 ## Launch: GitHub → Cloudflare Pages
 
