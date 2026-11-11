@@ -17,5 +17,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - name: Check secret files are not committed
+        shell: bash
         run: |
-          if git ls-files | grep -E '^(.dev.vars|.env|.wrangler/|node_modules/)' ; then exit 1; fi
+          # Do not flag the documented .env.example template; it contains no live secrets.
+          if git ls-files | grep -E '^(\.dev\.vars($|\.)|\.env($|\.(local|production|staging|development|test)($|\.))|\.wrangler/|node_modules/)'; then
+            echo 'Refusing to build: a local secret or generated directory is tracked.'
+            exit 1
+          fi
