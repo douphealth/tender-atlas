@@ -1,0 +1,12 @@
+name = "tender-atlas"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "."
+
+[vars]
+APP_ENV = "production"
+
+# Uncomment after running: npx wrangler d1 create tender-atlas-db
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "tender-atlas-db"
+# database_id = "YOUR_D1_DATABASE_ID"

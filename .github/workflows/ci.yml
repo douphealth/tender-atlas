@@ -1,14 +1,14 @@
-name: Quality gate
+name: TenderAtlas v10.6 quality gate
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+permissions:
+  contents: read
 jobs:
   quality:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,11 +16,9 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm run check
-      - name: Check secret files are not committed
+      - name: Ensure no secret files are tracked
         shell: bash
         run: |
-          # Do not flag the documented .env.example template; it contains no live secrets.
           if git ls-files | grep -E '^(\.dev\.vars($|\.)|\.env($|\.(local|production|staging|development|test)($|\.))|\.wrangler/|node_modules/)'; then
-            echo 'Refusing to build: a local secret or generated directory is tracked.'
-            exit 1
+            echo 'A secret or generated folder is tracked'; exit 1
           fi

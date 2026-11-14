@@ -1,316 +1,339 @@
-import {deadlineCategory,visibleItems,upcomingWithin,makeCsv,marketsInView} from './insights.js';
-import {summarizeEvidence,publicationSeries,topBuyers,readStages,pipelineCounts,normalizeLocalProfile,PIPELINE_STAGES,scoreRelevance,daysToListedDeadline} from './workbench.js';
-const ICONS={
- compass:'<circle cx="12" cy="12" r="9"/><path d="m15.6 8.4-2.4 4.8-4.8 2.4 2.4-4.8z"/>',
- bookmark:'<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4-7 4z"/>',
- bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
- building:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h2m4 0h2M8 11h2m4 0h2M8 15h2m4 0h2m-5 6v-3h2v3"/>',
- credit:'<rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 9h20m-15 6h4"/>',
- book:'<path d="M4 3h7a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3H4z"/><path d="M20 3h-3a3 3 0 0 0-3 3v15a3 3 0 0 1 3-3h3z"/>',
- external:'<path d="M14 4h6v6m0-6-9 9"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
- arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
- search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
- check:'<path d="m5 12 4 4L19 6"/>',
- globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
- layers:'<path d="m12 3 9 5-9 5-9-5 9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
- shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
- refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.8 9A7 7 0 0 1 19 7l1 5M4 12l1 5a7 7 0 0 0 13.2-2"/>',
- sparkles:'<path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3zM20 17l.8 2.2L23 20l-2.2.8L20 23l-.8-2.2L17 20l2.2-.8L20 17z"/>',
- calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/>',
- clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
- x:'<path d="M18 6 6 18M6 6l12 12"/>',
- lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
- target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
- filter:'<path d="M4 6h16M7 12h10m-7 6h4"/>',
- alert:'<path d="m12 3 10 18H2L12 3zM12 9v5m0 3v.5"/>',
- info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
- briefcase:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/>',
- inbox:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h5l2 3h4l2-3h5"/>'
-};
-const $=sel=>document.querySelector(sel),$$=sel=>[...document.querySelectorAll(sel)];
-function icon(name){return `<span class="svg-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[name]||ICONS.info}</svg></span>`;}
-function icons(root=document){root.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[el.dataset.icon]||ICONS.info}</svg>`;});}
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state={view:'discover',session:null,profile:null,localProfile:null,pipelineStages:{},density:'comfortable',items:[],saved:[],alerts:[],sourceMeta:[],partial:false,searching:false,searchSeq:0,page:1,lang:localStorage.getItem('ta:lang')==='el'?'el':'en',health:null,aiResults:{},guestSaved:[],features:{},sourceErrors:[],queriedAt:null,searchAbort:null};
-const text={en:{discover:'Discover',saved:'Saved opportunities',alerts:'Smart alerts',workspace:'Company profile',billing:'Plans & billing',search:'Explore tenders',noResults:'No notices match the current filters.',fail:'Official source search could not complete.',signin:'Sign in',signout:'Sign out',savedok:'Opportunity saved.',savedremove:'Removed from shortlist.',verify:'Verify official deadline',open:'Open official notice'},el:{discover:'Αναζήτηση',saved:'Αποθηκευμένα',alerts:'Ειδοποιήσεις',workspace:'Προφίλ εταιρείας',billing:'Πλάνα & πληρωμές',search:'Αναζήτηση έργων',noResults:'Δεν βρέθηκαν αποτελέσματα με αυτά τα φίλτρα.',fail:'Δεν ήταν δυνατή η σύνδεση με τις επίσημες πηγές.',signin:'Σύνδεση',signout:'Αποσύνδεση',savedok:'Η ευκαιρία αποθηκεύτηκε.',savedremove:'Αφαιρέθηκε από τη λίστα.',verify:'Επιβεβαίωση προθεσμίας',open:'Επίσημη προκήρυξη'}};
-const t=k=>text[state.lang][k]||k;
+/** TenderAtlas 10.6 · Source-first procurement research client. No synthetic procurement records. */
+const STORAGE='tenderatlas.workspace.v10';
+const V9='tenderatlas.workspace.v9';
+const V8='tenderatlas.workspace.v8';
+const V7='tenderatlas.workspace.v7';
+const SOURCE={ted:'EU TED',gr:'GR KIMDIS',uk:'UK Find a Tender',fr:'FR BOAMP',wb:'World Bank',sam:'US SAM.gov'};
+const SOURCE_DOC={ted:'https://docs.ted.europa.eu/api/latest/search.html',gr:'https://cerpp.eprocurement.gov.gr/khmdhs-opendata/help',uk:'https://www.find-tender.service.gov.uk/Developer/Documentation',fr:'https://boamp-datadila.opendatasoft.com/explore/dataset/boamp/api/',wb:'https://search.worldbank.org/api/v2/procnotices',sam:'https://open.gsa.gov/api/get-opportunities-public-api/'};
+const COUNTRY={GRC:'Greece',GBR:'United Kingdom',USA:'United States',DEU:'Germany',FRA:'France',ITA:'Italy',ESP:'Spain',NLD:'Netherlands',BEL:'Belgium',AUT:'Austria',POL:'Poland',SWE:'Sweden',DNK:'Denmark',CYP:'Cyprus',FIN:'Finland',NOR:'Norway',PRT:'Portugal',IRL:'Ireland',ROU:'Romania',HRV:'Croatia',HUN:'Hungary',BGR:'Bulgaria',SVK:'Slovakia',SVN:'Slovenia',LVA:'Latvia',LTU:'Lithuania',EST:'Estonia',LUX:'Luxembourg',CZE:'Czechia',MLT:'Malta',ISL:'Iceland',CHE:'Switzerland',TUR:'Türkiye',BRA:'Brazil',IND:'India',EGY:'Egypt',MAR:'Morocco',KEN:'Kenya',NGA:'Nigeria',CAN:'Canada',AUS:'Australia',JPN:'Japan'};
+const NAV={overview:'Overview',explore:'Opportunity finder',pipeline:'Bid pipeline',intelligence:'Market intelligence',watchlists:'Search monitors',profile:'Company profile',sources:'Data transparency',settings:'Settings & backup'};
+const STAGES=[['new','To review'],['qualified','Qualified'],['preparing','Preparing'],['submitted','Submitted'],['won','Won'],['lost','Not pursued']];
+const BOARD_STAGES=STAGES.slice(0,4);
+const CHECKS=[['deadline','Verified date, time and time zone in the original notice'],['eligibility','Reviewed location, legal entity and eligibility criteria'],['scope','Read the scope, lots, annexes and technical requirements'],['financial','Checked budget, costs, payment terms and risks'],['bid','Recorded a bid/no-bid decision and responsible owner']];
+const SECTORS=[['IT & cloud','72000000','cloud'],['Construction','45000000','building-2'],['Healthcare','33000000','heart-pulse'],['Energy','09000000','zap'],['Consulting','79000000','briefcase'],['Engineering','71000000','wrench']];
+const PRESETS={it:{keywords:'software development, cloud infrastructure, cybersecurity, data analytics, AI, automation',cpv:'72000000, 72262000, 72200000',countries:'GRC, GBR, DEU, FRA'},construction:{keywords:'construction, renovation, building services, civil engineering',cpv:'45000000, 45200000',countries:'GRC, GBR'},health:{keywords:'medical equipment, diagnostic devices, healthcare IT, laboratory',cpv:'33000000, 33100000',countries:'GRC, GBR, DEU'},energy:{keywords:'solar, photovoltaic, renewable energy, batteries, electricity',cpv:'09330000, 09331200',countries:'GRC, ESP, ITA'},consulting:{keywords:'consulting, audit, research, management, professional services',cpv:'79000000, 79400000',countries:'GRC, GBR'}};
+const PATHS={
+'layout-dashboard':'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+'search':'<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/>',
+'kanban':'<rect x="3" y="3" width="7" height="18" rx="1.6"/><rect x="14" y="3" width="7" height="11" rx="1.6"/>',
+'chart-bar':'<path d="M3 20V5m0 15h18M7 15v-5h3v5m4 0V5h3v10m3 0v-8h3v8"/>',
+'radar':'<circle cx="12" cy="12" r="9"/><path d="M12 12 18 6M12 3v3m0 12v3M3 12h3m12 0h3"/>',
+'building-2':'<rect x="3" y="9" width="13" height="12" rx="1"/><path d="M7 9V3h13v18M7 13h2m2 0h2M7 17h2m2 0h2m5-11v2m0 3v2m0 3v2"/>',
+'shield-check':'<path d="m12 2 9 4v6c0 5-3.5 8-9 10-5.5-2-9-5.5-9-10V6l9-4z"/><path d="m8 12 3 3 5-6"/>',
+'sliders':'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/>',
+'moon':'<path d="M20 16A9 9 0 0 1 8 4 9 9 0 1 0 20 16z"/>',
+'sun':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/>',
+'user-round':'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+'menu':'<path d="M4 6h16M4 12h16M4 18h16"/>',
+'arrow-up-right':'<path d="M7 17 17 7M8 7h9v9"/>',
+'arrow-right':'<path d="M4 12h16m-7-7 7 7-7 7"/>',
+'chevron-right':'<path d="m9 5 7 7-7 7"/>',
+'plus':'<path d="M12 4v16M4 12h16"/>',
+'check':'<path d="m5 12 5 5L20 7"/>',
+'check-circle':'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+'alert-circle':'<circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3v.1"/>',
+'calendar':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 2v6m8-6v6M3 10h18"/>',
+'clock':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+'globe':'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-5 6-5 12 0 18M12 3c5 6 5 12 0 18"/>',
+'bookmark':'<path d="M6 4h12v17l-6-4-6 4V4z"/>',
+'refresh-cw':'<path d="M20 7v5h-5M4 17v-5h5M5 9a8 8 0 0 1 14-2l1 5M4 12l1 5a8 8 0 0 0 14-2"/>',
+'file-text':'<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7M8 13h8M8 17h8"/>',
+'download':'<path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/>',
+'copy':'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+'filter':'<path d="M4 6h16M7 12h10m-7 6h4"/>',
+'chevrons-up-down':'<path d="m7 10 5-5 5 5M7 14l5 5 5-5"/>',
+'bolt':'<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+'zap':'<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+'briefcase':'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13c5 3 13 3 18 0"/>',
+'heart-pulse':'<path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.9-8.5a5.5 5.5 0 0 0-.1-7.8zM3 12h5l2-3 3 6 2-3h6"/>',
+'wrench':'<path d="M14 7a5 5 0 0 0-7 7l-4 4a2 2 0 0 0 3 3l4-4a5 5 0 0 0 7-7l-4 4-3-3 4-4z"/>',
+'cloud':'<path d="M18 19H7a5 5 0 0 1-1-9.9A7 7 0 0 1 19.5 11 4 4 0 0 1 18 19z"/>',
+'sparkles':'<path d="m12 2 2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/>',
+'close':'<path d="M5 5 19 19M19 5 5 19"/>',
+'info':'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.2"/>',
+'file-spreadsheet':'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M9 9v12m0-7h11"/>',
+'circle-dot':'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>',
+'list-checks':'<path d="m4 7 2 2 3-3M12 8h8m-16 8 2 2 3-3m3 2h8"/>',
+'shield-alert':'<path d="m12 2 9 4v6c0 5-3.5 8-9 10-5.5-2-9-5.5-9-10V6l9-4zM12 7v6m0 3v.1"/>',
+'external-link':'<path d="M13 4h7v7m0-7-9 9M20 14v6H4V4h6"/>',
+'arrow-left':'<path d="M20 12H4m7-7-7 7 7 7"/>',
+'archive':'<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v12h14V9m-9 5h4"/>',
+'server':'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 7h.1M7 18h.1"/>',
+'eye':'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+'file-down':'<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM13 2v7h7m-8 3v7m-4-4 4 4 4-4"/>',
+'help-circle':'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 1c0 2-3 2-3 5m0 3v.2"/>'};
+const $=id=>document.getElementById(id);
+const ico=(name,extra='')=>`<svg class="${extra}" aria-hidden="true" viewBox="0 0 24 24">${PATHS[name]||PATHS.info}</svg>`;
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=x=>{try{const u=new URL(x);return u.protocol==='https:'?u.href:null}catch{return null}};
+const csvValue=x=>{let s=String(x??'');if(/^[\s]*[=+@\-]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`};
+const list=x=>String(x??'').split(/[,;\n]/).map(v=>v.trim()).filter(Boolean).slice(0,36);
+const token=x=>String(x??'').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
+const fmtInt=x=>new Intl.NumberFormat('en-US').format(x);
+const region=c=>COUNTRY[c]||c||'Not disclosed';
+const sourceName=s=>SOURCE[s]||s||'Official source';
+const today=()=>new Date().toISOString().slice(0,10);
+const until=d=>d?Math.round((Date.parse(d+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/86400000):null;
+const day=d=>d?new Intl.DateTimeFormat('en-US',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z')):'Not disclosed';
+const shortDay=d=>d?new Intl.DateTimeFormat('en-US',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z')):'—';
+const money=n=>n?.value?(n.currency&&['EUR','GBP','USD','DKK','NOK','SEK','CHF','PLN','HUF'].includes(n.currency)?new Intl.NumberFormat('en-US',{style:'currency',currency:n.currency,maximumFractionDigits:0}).format(n.value):fmtInt(n.value)+(n.currency?` ${n.currency}`:' · currency unknown')):'Not disclosed';
+const makeId=()=>crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const SCHEMA_VERSION=1041;
+const MIGRATED_FLAG='tenderatlas.workspace.migrated_v1041';
+const emptyStore=()=>({schemaVersion:SCHEMA_VERSION,saved:[],watchlists:[],profile:{name:'',keywords:'',cpv:'',countries:'',exclude:''},settings:{theme:'light',dense:false}});
+function sanitizeStore(obj){
+ const base=emptyStore();
+ const saved=(Array.isArray(obj?.saved)?obj.saved:[]).slice(0,300).filter(x=>x&&x.id&&x.notice&&x.notice.title).map(x=>({id:String(x.id),notice:x.notice,stage:STAGES.some(s=>s[0]===x.stage)?x.stage:'new',notes:String(x.notes||'').slice(0,5000),checks:typeof x.checks==='object'&&x.checks||{},createdAt:x.createdAt||new Date().toISOString()}));
+ const watchlists=(Array.isArray(obj?.watchlists)?obj.watchlists:[]).slice(0,45).filter(x=>x?.id&&x?.name);
+ return {schemaVersion:SCHEMA_VERSION,saved,watchlists,profile:{...base.profile,...(obj?.profile&&typeof obj.profile==='object'?obj.profile:{})},settings:{theme:obj?.settings?.theme==='dark'?'dark':'light',dense:!!obj?.settings?.dense}};
+}
+export function loadStore(){try{
+ const base=emptyStore();
+ const curRaw=localStorage.getItem(STORAGE);
+ let curObj=null;
+ if(curRaw){try{curObj=JSON.parse(curRaw);}catch{}}
+ const alreadyMigrated=localStorage.getItem(MIGRATED_FLAG)==='1'||(curObj&&Number(curObj.schemaVersion)>=SCHEMA_VERSION);
+ if(alreadyMigrated){
+  return curObj?sanitizeStore(curObj):base;
+ }
+ const keys=[STORAGE,V9,V8,V7];
+ const parsed=[];
+ for(const k of keys){
+  const raw=localStorage.getItem(k);
+  if(!raw)continue;
+  try{const obj=JSON.parse(raw);if(obj&&typeof obj==='object')parsed.push({key:k,obj});}catch{}
+ }
+ if(!parsed.length){
+  try{localStorage.setItem(MIGRATED_FLAG,'1');}catch{}
+  return base;
+ }
+ try{localStorage.setItem('tenderatlas.workspace.backup.pre_1041',JSON.stringify(parsed));}catch{}
+ const savedMap=new Map(),watchMap=new Map();
+ let mergedProfile={...base.profile},mergedSettings={...base.settings};
+ for(const {obj} of [...parsed].reverse()){
+  for(const x of (Array.isArray(obj.saved)?obj.saved:[])){
+   if(x&&x.id&&x.notice&&x.notice.title){
+    const id=String(x.id);
+    savedMap.set(id,{id,notice:x.notice,stage:STAGES.some(s=>s[0]===x.stage)?x.stage:'new',notes:String(x.notes||'').slice(0,5000),checks:typeof x.checks==='object'&&x.checks||{},createdAt:x.createdAt||new Date().toISOString()});
+   }
+  }
+  for(const w of (Array.isArray(obj.watchlists)?obj.watchlists:[])){if(w?.id&&w?.name)watchMap.set(String(w.id),w);}
+  if(obj.profile&&typeof obj.profile==='object'){for(const [pk,pv] of Object.entries(obj.profile)){if(pv)mergedProfile[pk]=pv;}}
+  if(obj.settings?.theme==='dark')mergedSettings.theme='dark';
+  if(obj.settings?.dense)mergedSettings.dense=true;
+ }
+ const out={schemaVersion:SCHEMA_VERSION,saved:[...savedMap.values()].slice(0,300),watchlists:[...watchMap.values()].slice(0,45),profile:mergedProfile,settings:mergedSettings};
+ try{localStorage.setItem(STORAGE,JSON.stringify(out));localStorage.setItem(MIGRATED_FLAG,'1');}catch{}
+ return out;
+ }catch{return emptyStore()}}
+let store=loadStore();
+const state={view:'overview',loading:false,loaded:false,items:[],health:{},fetchedAt:null,fromEdgeCache:false,responseMs:null,error:'',query:'',source:'all',country:'',days:30,cpv:'',page:1,more:false,sort:'recent',currency:'',minimum:'',status:'any',deadlineOnly:false,relevantOnly:false,compare:[],seq:0};
+function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(store))}catch{toast('Local storage is full; export a backup to avoid losing research.')}}
 let toastTimer;
-function toast(msg,error=false){const el=$('#toast');el.textContent=msg;el.classList.toggle('error',error);el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),4500);}
-async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',headers:{...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})},...options});let data;try{data=await r.json();}catch{throw Error(`Server returned non-JSON (HTTP ${r.status})`);}if(!r.ok)throw Error(data.error||`Request failed (${r.status})`);return data;}
-const dateFmt=iso=>{if(!iso)return 'Not available';const d=new Date(iso.slice(0,10)+'T12:00:00Z');return Number.isNaN(d.getTime())?'Not available':new Intl.DateTimeFormat(state.lang==='el'?'el-GR':'en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(d);};
-const euroFmt=(v,currency)=>{if(!Number.isFinite(Number(v))||v==null)return 'Not disclosed';try{return new Intl.NumberFormat(state.lang==='el'?'el-GR':'en-GB',{style:'currency',currency:currency||'EUR',maximumFractionDigits:0}).format(v);}catch{return 'Not disclosed';}};
-const safeUrl=url=>{try{const u=new URL(url);return u.protocol==='https:'?u.href:'#';}catch{return '#';}};
-const savedIds=()=>new Set(state.saved.map(x=>x.noticeId));
-const localSaveKey='ta:guestSaved:v1';
-const localProfileKey='ta:guestProfile:v2';
-const stageKey='ta:pipelineStages:v2';
-const densityKey='ta:density:v2';
-function readGuestSaved(){try{const x=JSON.parse(localStorage.getItem(localSaveKey)||'[]');return Array.isArray(x)?x.filter(r=>r&&typeof r.noticeId==='string'&&typeof r.sourceUrl==='string').slice(0,60):[];}catch{return [];}}
-function persistGuestSaved(){try{localStorage.setItem(localSaveKey,JSON.stringify(state.guestSaved.slice(0,60)));}catch(e){toast('Browser storage is full. Saved opportunities may not persist on this device.',true);}}
-function currentViewItems(){const filtered=state.items.filter(n=>(!$('#filter-valued')?.checked||(n.budget!=null&&Number.isFinite(Number(n.budget))))&&(!$('#filter-relevant')?.checked||(state.profile&&(calculateMatch(n)?.score||0)>=35)));return visibleItems(filtered,{status:$('#filter-status')?.value||'all',sort:$('#filter-sort')?.value||'recent',scoreFn:state.profile?calculateMatch:null});}
-function percentClass(p){return `pct-${Math.max(0,Math.min(100,Math.round(p/5)*5))}`;}
-function completenessMarkup(items){
- const ev=summarizeEvidence(items);const entries=[['Deadline reported',ev.deadlines],['Value disclosed',ev.values],['CPV classified',ev.cpv]];
- return entries.map(([label,value])=>`<div class="completeness-row"><div class="completeness-heading"><span>${label}</span><strong>${ev.total?ev.ratio(value)+'%':'—'}</strong></div><div class="completeness-bar"><div class="completeness-fill ${percentClass(ev.ratio(value))}"></div></div></div>`).join('');
+function toast(msg){const el=$('toast');el.textContent=String(msg);el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3600)}
+function setTheme(){document.documentElement.dataset.theme=store.settings.theme==='dark'?'dark':'light';$('theme-btn').innerHTML=ico(store.settings.theme==='dark'?'sun':'moon')}
+function savedRecord(id){return store.saved.find(x=>x.id===id)}
+function notice(id){return state.items.find(x=>x.id===id)||savedRecord(id)?.notice||null}
+function saveRecord(n){let old=savedRecord(n.id);if(!old){old={id:n.id,notice:n,stage:'new',notes:'',checks:{},createdAt:new Date().toISOString()};store.saved.unshift(old);store.saved=store.saved.slice(0,300);}else old.notice=n;persist();return old;}
+function toggleSaved(id){const n=notice(id);if(!n)return;let old=savedRecord(id);if(old)store.saved=store.saved.filter(x=>x.id!==id);else saveRecord(n);persist();chrome();render();toast(old?'Removed from local pipeline':'Saved to your local pipeline')}
+const score=n=>scoreNotice(n,store.profile);
+export function scoreNotice(n,profile={}){
+ const kws=list(profile.keywords), cpvs=list(profile.cpv).map(c=>c.replace(/\D/g,'')).filter(x=>x.length>=2),markets=list(profile.countries).map(x=>x.toUpperCase()),exclude=list(profile.exclude);
+ if(!kws.length&&!cpvs.length)return {value:null,reasons:[],confidence:'Add services or CPV codes to activate fit analysis'};
+ const title=String(n.title||'').toLocaleLowerCase(),other=String([n.description||n.summary||'',n.buyer||''].join(' ')).toLocaleLowerCase(),full=`${title} ${other}`;
+ if(exclude.some(x=>full.includes(x.toLocaleLowerCase())))return {value:0,reasons:['Excluded phrase in this notice'],confidence:'Exclusion match'};
+ let raw=0,substantive=false;const reasons=[];
+ for(const k of kws.slice(0,16)){
+  const phrase=k.toLocaleLowerCase();const keyTokens=token(phrase);if(!keyTokens.length)continue;
+  const titleHit=phrase.includes(' ')?title.includes(phrase):token(title).includes(phrase);
+  const otherHit=phrase.includes(' ')?other.includes(phrase):token(other).includes(phrase);
+  if(titleHit){raw+=15;substantive=true;reasons.push('Service in notice title: '+k)}
+  else if(otherHit){raw+=7;substantive=true;reasons.push('Related description: '+k)}
+ }
+ raw=Math.min(54,raw);
+ let best=0;
+ for(const t of cpvs){for(const c0 of n.cpv||[]){const c=String(c0).replace(/\D/g,'');if(!c)continue;best=Math.max(best,c===t?34:c.startsWith(t.slice(0,5))&&t.length>=5?25:c.slice(0,3)===t.slice(0,3)?14:c.slice(0,2)===t.slice(0,2)?6:0)}}
+ if(best){substantive=true;raw+=best;reasons.push(best>=25?'Matching CPV category':'Related CPV sector')}
+ if(markets.includes(n.country)){raw+=7;reasons.push('Target buyer market')}
+ if(n.deadlineAt&&until(n.deadlineAt)>=0&&substantive){raw+=3;reasons.push('Source provides a future deadline')}
+ // Market-only matches are not substantive; never infer legal eligibility or probability of winning.
+ const value=substantive?Math.min(90,Math.round(raw)):markets.includes(n.country)?7:0;
+ return {value,reasons:reasons.slice(0,6),confidence:!substantive?'Insufficient service/CPV evidence':best>=25?'CPV-supported heuristic match':'Keyword-based heuristic match'};
 }
-function renderIntelligence(){
- const items=state.items,ev=summarizeEvidence(items),stats=[['Retrieved records',items.length,'From current query'],['Markets',ev.markets,'In returned records'],['Deadlines provided',ev.total?`${ev.ratio(ev.deadlines)}%`:'—','Not proof bids are open'],['Feeds responding',state.sourceMeta.length,'Of sources attempted']];
- $('#insight-kpis').innerHTML=stats.map(([label,value,caption])=>`<div class="insight-kpi"><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(caption)}</em></div>`).join('');
- const markets=marketsInView(items).slice(0,8),max=Math.max(1,...markets.map(x=>x.total));
- $('#insight-markets').innerHTML=markets.length?markets.map(m=>`<div class="insight-bar-entry"><span title="${esc(m.name)}">${esc(m.name)}</span><div class="bar-track" role="img" aria-label="${esc(m.name)}: ${m.total} records"><span class="${percentClass(100*m.total/max)}"></span></div><strong>${m.total}</strong></div>`).join(''):empty('No market sample yet','Search for notices before analyzing market distribution.','globe');
- const names={ted:'European Union · TED',khmdhs:'Greece · ΚΗΜΔΗΣ',uk:'United Kingdom · Find a Tender',sam:'United States · SAM.gov'};
- const good=state.sourceMeta.map(m=>`<div class="insight-source"><div class="insight-source-top"><strong>${esc(names[m.source]||m.source)}</strong><span>${Number(m.count||0)} fetched</span></div><small>${esc(m.coverage||'Source replied')} · ${Number(m.pagesScanned||1)} page(s) scanned</small></div>`).join('');
- const errors=state.sourceErrors.map(e=>`<div class="insight-source"><div class="insight-source-top"><strong>${esc(names[e.source]||e.source)}</strong><span class="failed">Unavailable</span></div><small>${esc(e.reason)}</small></div>`).join('');
- $('#insight-sources').innerHTML=good+errors||'<div class="muted">Search a market to inspect live source responses.</div>';
- const pub=publicationSeries(items,7),peak=Math.max(1,...pub.map(b=>b.count));
- $('#insight-trend').innerHTML=pub.map(d=>`<div class="trend-col"><div class="trend-track"><div class="trend-bar ${percentClass(100*d.count/peak)}"></div></div><strong>${d.count}</strong><small>${esc(d.date.slice(5))}</small></div>`).join('');
- $('#insight-quality').innerHTML='<p class="rail-explainer">Fraction of retrieved records with these publisher-supplied fields. Missing values remain unknown.</p>'+completenessMarkup(items)+'<p class="rail-explainer insight-quality-note">Source publication dates are not proof a tender is currently open. Look for amendments and official closing times.</p>';
- renderBuyers();
+function quality(n){const items=[];if(!n.deadlineAt)items.push('No deadline provided');else if(n.deadlineAt<today())items.push('Source date appears passed');if(!n.value)items.push('Estimated value not disclosed');if(!n.buyer)items.push('Buyer missing');if(!(n.cpv||[]).length)items.push('CPV not provided');if(['award','planning'].includes(n.stage))items.push('Non-competition stage');if(['awarded','cancelled'].includes(n.status))items.push('Awarded or cancelled');return items}
+const counts=(items,key)=>{const obj={};for(const n of items){let k=key(n)||'Unknown';obj[k]=(obj[k]||0)+1}return Object.entries(obj).sort((a,b)=>b[1]-a[1])};
+function docsLink(n){const url=safeUrl(n.url);return url?`<a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ico('external-link')} Official notice</a>`:`<span class="pill gold">Official link unavailable</span>`}
+export function isBidReadyCandidate(n){
+ const st=String(n?.status||'').toLowerCase();
+ if(n?.stage!=='competition')return false;
+ if(['inactive','closed','awarded','cancelled','deadline-passed','unknown'].includes(st))return false;
+ if(n?.deadlineAt&&n.deadlineAt<today())return false;
+ return true;
 }
-function renderBuyers(){
- const buyers=topBuyers(state.items,7);
- const max=Math.max(1,...buyers.map(x=>x.count));
- $('#insight-buyers').innerHTML=buyers.length?buyers.map((b,i)=>`<div class="buyer-rank"><span class="buyer-index">${String(i+1).padStart(2,'0')}</span><div class="buyer-data"><strong>${esc(b.name)}</strong><div class="buyer-track"><span class="${percentClass(b.count/max*100)}"></span></div></div><b>${b.count}</b></div>`).join(''):empty('No authority names in this sample','Buyer names will appear after you retrieve suitable notices.','building');
+export function chipState(n){
+ const st=String(n?.status||'').toLowerCase();
+ if(st==='disposal'||n?.stage==='disposal')return '<span class="pill">Surplus Disposal — not a supplier tender</span>';
+ if(st==='inactive'||st==='closed')return '<span class="pill">Inactive / Archived — verify official status</span>';
+ if(st==='awarded'||n?.stage==='award')return '<span class="pill gold">Award stage</span>';
+ if(st==='cancelled')return '<span class="pill red">Cancelled</span>';
+ if(n?.stage==='planning')return '<span class="pill">Planning / Pre-tender</span>';
+ if(st==='unknown'||n?.stage==='unknown')return '<span class="pill gold">Research only — status unverified</span>';
+ if(n?.deadlineAt){const d=until(n.deadlineAt);if(d<0)return '<span class="pill red">Date passed</span>';return `<span class="pill green">Source date: ${d}d left</span>`;}
+ return '<span class="pill gold">Deadline unknown</span>';
 }
-function readLocalProfile(){try{return normalizeLocalProfile(JSON.parse(localStorage.getItem(localProfileKey)||'null'));}catch{return null;}}
-function saveLocalProfile(profile){try{localStorage.setItem(localProfileKey,JSON.stringify(profile));return true;}catch{return false;}}
-function readLocalStages(){try{return readStages(JSON.parse(localStorage.getItem(stageKey)||'{}'));}catch{return {};}}
-function persistStages(){try{localStorage.setItem(stageKey,JSON.stringify(state.pipelineStages));return true;}catch{return false;}}
-function renderFocusHighlights(){
-  const el=$('#focus-highlights');if(!el)return;
-  const now=new Date().toISOString().slice(0,10);
-  const candidates=state.items.filter(n=>n.deadline&&n.deadline>=now&&n.status!=='cancelled'&&n.status!=='archived').sort((a,b)=>{
-    if(state.profile){const difference=(calculateMatch(b)?.score||0)-(calculateMatch(a)?.score||0);if(difference)return difference;}
-    return a.deadline.localeCompare(b.deadline);
-  }).slice(0,3);
-  $('#decision-explainer').textContent=state.profile?'Matches ranked by your saved criteria; bidding eligibility must be checked.':'Notices with future deadlines in the current retrieved sample, not a claim they are open for bidding.';
-  el.innerHTML=candidates.length?candidates.map((n,i)=>{
-    const match=state.profile?calculateMatch(n):null;
-    const note=match?`${match.score}/100 profile relevance`:`${dateFmt(n.deadline)} deadline`;
-    return `<a class="focus-item" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer"><span class="focus-num">${String(i+1).padStart(2,'0')}</span><span class="focus-copy"><strong>${esc(n.title)}</strong><small>${esc(n.countryName||n.country||'Source market')} · ${esc(note)}</small></span>${icon('arrow')}</a>`;
-  }).join(''):`<div class="focus-empty">${state.items.length?'No future deadlines were reported in this sample.':'Search official notices to see evidence-backed candidates here.'}</div>`;
+function metric(label,value,detail,iconName){return `<div class="metric-card card"><div class="metric-label">${ico(iconName)}${esc(label)}</div><div class="metric-main">${esc(value)}</div><div class="metric-sub">${esc(detail)}</div></div>`}
+function scopeNotice(){const bad=Object.entries(state.health).filter(([,v])=>v.status==='error');const incomplete=Object.entries(state.health).some(([,v])=>v.status==='ok'&&v.partial);let msg='Bounded live publisher sample. Results are not a complete tender register.';if(incomplete)msg+=' Some sources have more pages.';if(bad.length)msg+=` ${bad.map(([s])=>sourceName(s)).join(', ')} did not respond.`;return `<div class="alert info">${ico('info')}${esc(msg)} <a href="/methodology.html" target="_blank" rel="noopener noreferrer"><strong>Methodology ↗</strong></a></div>`}
+function sourceStatus(s){const h=state.health[s]||{status:state.loading?'loading':'not-queried',count:0};const status=h.status;const tag=status==='ok'?`<span class="source-state ok">${fmtInt(h.count)} sampled</span>`:status==='error'?'<span class="source-state error">Unavailable</span>':status==='not-configured'?'<span class="source-state disabled">Needs API key</span>':status==='loading'?'<span class="source-state">Connecting</span>':'<span class="source-state">Not queried</span>';return tag}
+function latestNotices(items,limit=5){if(!items.length)return empty('No opportunities in this view','Change the filters or retry official publishers.','search');return `<div class="notice-list">${items.slice(0,limit).map(n=>`<article class="notice-row"><div class="notice-main"><div class="row-meta"><span>${esc(sourceName(n.source))}</span><span>·</span><span>${esc(region(n.country))}</span><span>·</span><span>${esc(shortDay(n.publishedAt))}</span></div><button class="title-btn" data-action="dossier" data-id="${esc(n.id)}">${esc(n.title)}</button><span class="buyer">${esc(n.buyer||'Buyer not disclosed')}</span><div class="row-tags">${chipState(n)}</div></div><div class="notice-right"><strong>${esc(n.value?money(n):'Value unavailable')}</strong><small>${esc(n.deadlineAt?`Deadline ${shortDay(n.deadlineAt)}`:'No deadline')}</small></div><button class="save-btn ${savedRecord(n.id)?'saved':''}" aria-label="${savedRecord(n.id)?'Unsave':'Save'} notice" data-action="toggle-save" data-id="${esc(n.id)}">${ico('bookmark')}</button></article>`).join('')}</div>`}
+function empty(title,desc,iconName='search',action=''){return `<div class="empty"><div class="empty-icon">${ico(iconName)}</div><h3>${esc(title)}</h3><p>${esc(desc)}</p>${action}</div>`}
+function heading(ey,title,subtitle,actions=''){return `<div class="section-heading"><div><div class="eyebrow">${esc(ey)}</div><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>${actions?`<div class="heading-actions">${actions}</div>`:''}</div>`}
+function heroArt(){return `<div class="hero-art" aria-hidden="true"><svg viewBox="0 0 250 156"><defs><linearGradient id="node" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a6fff0"/><stop offset="1" stop-color="#8a9aff"/></linearGradient></defs><path d="M15 112 83 37 168 75 230 18M83 37l-6 93 91-55 62 47M15 112l62 18 153-8" stroke="#9bc2f5" stroke-opacity=".36" stroke-width="1.3" fill="none"/><circle cx="83" cy="37" r="11" fill="#294b74" stroke="url(#node)" stroke-width="2"/><circle cx="168" cy="75" r="19" fill="#274a72" stroke="#b2dbed" stroke-width="2"/><circle cx="230" cy="18" r="9" fill="#294b74" stroke="#acb9ff" stroke-width="2"/><circle cx="15" cy="112" r="7" fill="#294b74" stroke="#8bddcf" stroke-width="2"/><circle cx="77" cy="130" r="10" fill="#294b74" stroke="#8bddcf" stroke-width="2"/><circle cx="230" cy="122" r="7" fill="#294b74" stroke="#8bddcf" stroke-width="2"/><circle cx="168" cy="75" r="6" fill="url(#node)"/><path d="m165 76 2 2 5-6" stroke="#203957" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>`}
+function marketBars(items,fn,n=5){const rows=counts(items,fn).slice(0,n);if(!rows.length)return `<p class="subtle">No current sample data.</p>`;const max=Math.max(...rows.map(x=>x[1]),1);return `<div class="bars">${rows.map(([key,count])=>`<div class="barrow"><label title="${esc(key)}">${esc(key)}</label><div class="bartrack"><div class="barfill" style="width:${Math.round(count/max*100)}%"></div></div><strong>${fmtInt(count)}</strong></div>`).join('')}</div>`}
+function priority(n){const fit=score(n);const scoreHTML=fit.value===null?'<span class="pill">Profile needed</span>':`<span class="pill ${fit.value>=50?'blue':''}">Fit ${fit.value}/90</span>`;return `<article class="tender-card card"><div><div class="tender-meta"><span class="pill">${esc(sourceName(n.source))}</span><span class="pill">${esc(region(n.country))}</span>${chipState(n)}${scoreHTML}</div><h3><button data-action="dossier" data-id="${esc(n.id)}">${esc(n.title)}</button></h3><p class="desc">${esc(n.description||'No description available in the source response. Open the official notice for the full scope.')}</p><div class="facts"><span>${ico('building-2')} <strong>${esc(n.buyer||'Buyer unavailable')}</strong></span><span>${ico('calendar')} Published ${esc(shortDay(n.publishedAt))}</span><span>CPV: ${esc((n.cpv||[]).slice(0,2).join(', ')||'Not listed')}</span></div></div><aside class="tender-side"><div class="big-money">${esc(money(n))}</div><div class="mini">${esc(n.deadlineAt?`Date listed: ${day(n.deadlineAt)}`:'Deadline not supplied')}</div><div class="side-actions"><button class="btn sm icon-only" data-action="toggle-save" data-id="${esc(n.id)}" title="Save" aria-label="Save">${ico('bookmark')}</button><button class="btn sm icon-only" data-action="compare" data-id="${esc(n.id)}" title="Compare" aria-label="Compare">${ico('list-checks')}</button><button class="btn sm primary" data-action="dossier" data-id="${esc(n.id)}">Review ${ico('chevron-right')}</button></div></aside></article>`}
+function overview(){const n=state.items,loaded=state.loaded,validDeadline=n.filter(x=>x.deadlineAt).length,countries=new Set(n.map(x=>x.country).filter(Boolean)).size,live=Object.values(state.health).filter(x=>x.status==='ok').length,matched=n.filter(x=>score(x).value>=35).length;
+ const loader=state.loading?'<div class="loading"><span class="spinner"></span><p>Fetching notices from official publishers…</p></div>':state.error?empty('Publishers could not be reached',state.error,'alert-circle',`<button class="btn primary" data-action="refresh">Retry now</button>`):latestNotices([...n].sort((a,b)=>String(b.publishedAt||'').localeCompare(String(a.publishedAt||''))),6);
+ return `${heading('Your intelligence workspace','Your next public-sector opportunity.','Discover verified-source notices, qualify what matters, and keep every bid moving.',`<button class="btn" data-action="refresh">${ico('refresh-cw')} Refresh sources</button><button class="btn primary" data-view="explore">${ico('search')} Find opportunities</button>`)}
+ <section class="intro-hero"><div><div class="eyebrow">THE PROCUREMENT ADVANTAGE</div><h2>Less searching. More strategic opportunities.</h2><p>Six official procurement ecosystems, one focused research desk. Every figure comes from notices retrieved in this session — never fabricated market statistics.</p><div class="hero-actions"><button data-view="explore" class="btn white">Explore live notices ${ico('arrow-right')}</button><button data-view="profile" class="btn glass">Build your company fit ${ico('sparkles')}</button></div></div>${heroArt()}</section>
+ ${state.error?`<div class="alert error">${ico('alert-circle')}${esc(state.error)}</div>`:''}
+ <div class="metric-grid">${metric('Notices in current sample',loaded?fmtInt(n.length):'—','These are not market-wide totals','file-text')}${metric('Source-provided deadlines',loaded?fmtInt(validDeadline):'—','Dates still require official verification','calendar')}${metric('Buyer markets represented',loaded?fmtInt(countries):'—','In the current retrieved result set','globe')}${metric('Saved for review',fmtInt(store.saved.length),`${loaded?live:0} feeds responded · ${matched} fit matches in sample`,'bookmark')}</div>
+ ${loaded?scopeNotice():''}<div class="dashboard-grid"><section class="card card-pad"><div class="card-title"><div><h3>Latest discovered opportunities</h3><p>Source records, sorted by publication date. Opens a complete tender dossier.</p></div><button data-view="explore" class="btn sm soft">View all ${ico('arrow-right')}</button></div>${loader}</section><div class="stack"><section class="card card-pad"><div class="card-title"><div><h3>Publisher connectivity</h3><p>Live status for each official register</p></div><button data-view="sources" class="btn sm">Details</button></div>${Object.keys(SOURCE).map(s=>`<div class="source-row"><span class="source-logo">${s.toUpperCase()}</span><div style="flex:1"><strong>${esc(SOURCE[s])}</strong><small>${esc(state.health[s]?.coverage?.slice(0,42)||'Official government source')}</small></div>${sourceStatus(s)}</div>`).join('')}</section><section class="card card-pad"><div class="card-title"><div><h3>Explore sectors</h3><p>Search official CPV categories</p></div></div><div class="quick-sectors">${SECTORS.map(([label,cpv,ic])=>`<button data-action="sector" data-cpv="${cpv}" class="sector-btn">${ico(ic)}${esc(label)}${ico('arrow-right')}</button>`).join('')}</div></section></div></div>`;
 }
-function updateViewIndicators(){
-  const list=currentViewItems();
-  $('#stat-count').textContent=String(list.length);
-  $('#stat-countries').textContent=String(new Set(list.map(x=>x.country).filter(Boolean)).size);
-  $('#stat-sources').textContent=String(state.sourceMeta.length);
-  $('#stat-upcoming').textContent=String(upcomingWithin(list));
-  $('#pulse-total').textContent=String(state.items.length);
-  $('#pulse-markets').textContent=String(new Set(state.items.map(n=>n.country).filter(Boolean)).size);
-  $('#pulse-feeds').textContent=String(state.sourceMeta.length);
-  $('#pulse-checked').textContent=state.queriedAt?`Retrieved ${dateFmt(state.queriedAt)}`:'Awaiting first search';
-  $('#completeness-meters').innerHTML=completenessMarkup(list);
-  const context=$('#feed-context-description');if(context)context.textContent=`${state.items.length} retrieved from ${state.sourceMeta.length} responding source${state.sourceMeta.length===1?'':'s'} · not an exhaustive global index`;
-  $('#results').classList.toggle('compact',state.density==='compact');
-  $('#result-count').textContent=`(${list.length} in this view)`;
-  const sorted=marketsInView(list),max=Math.max(...sorted.map(x=>x.total),1);
-  $('#market-breakdown').innerHTML=sorted.length?sorted.slice(0,7).map(x=>`<div class="market-item"><div class="market-item-header"><span>${esc(x.name)}</span><span>${x.total}</span></div><div class="market-track"><progress value="${x.total}" max="${max}" aria-label="${esc(x.name)}: ${x.total}"></progress></div></div>`).join(''):'<span class="muted">No market data in this view.</span>';
+function filterControls(){const s=state;
+ return `<form id="filter-form" class="card filter-panel"><div class="field"><label for="query-input">Search official tenders</label><input id="query-input" name="q" type="search" value="${esc(s.query)}" placeholder="Try: cybersecurity, construction, photovoltaic…"></div><div class="field"><label for="source-input">Official register</label><select id="source-input" name="source"><option value="all">All available</option>${Object.entries(SOURCE).map(([k,v])=>`<option value="${k}" ${s.source===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div><div class="field"><label for="country-input">Buyer country</label><select id="country-input" name="country"><option value="">All countries</option>${Object.entries(COUNTRY).sort((a,b)=>a[1].localeCompare(b[1])).map(([k,v])=>`<option value="${k}" ${s.country===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div><div class="field"><label for="period-input">Published</label><select id="period-input" name="days">${[7,14,30,60,90].map(d=>`<option value="${d}" ${s.days===d?'selected':''}>Last ${d} days</option>`).join('')}</select></div><button class="btn primary" type="submit">${ico('search')} Search</button></form>
+ <div class="filter-secondary"><div class="field"><label for="cpv-input">CPV (optional)</label><input id="cpv-input" name="cpv" form="filter-form" value="${esc(s.cpv)}" placeholder="e.g. 72000000" maxlength="10" inputmode="numeric"></div><div class="field"><label for="sort-input">Sort results</label><select id="sort-input" data-local="sort"><option value="recent" ${s.sort==='recent'?'selected':''}>Most recent</option><option value="deadline" ${s.sort==='deadline'?'selected':''}>Soonest deadlines</option><option value="value" ${s.sort==='value'?'selected':''}>Highest disclosed value</option><option value="fit" ${s.sort==='fit'?'selected':''}>Best company fit</option></select></div><div class="field"><label for="status-input">Record stage</label><select id="status-input" data-local="status"><option value="any">All notices</option><option value="candidate" ${s.status==='candidate'?'selected':''}>Competition candidates</option><option value="dated" ${s.status==='dated'?'selected':''}>Future source date</option><option value="undated" ${s.status==='undated'?'selected':''}>No listed deadline</option></select></div><div class="field"><label for="currency-input">Currency</label><select id="currency-input" data-local="currency"><option value="">Any currency</option>${['EUR','GBP','USD','DKK','SEK','NOK','CHF'].map(k=>`<option ${s.currency===k?'selected':''}>${k}</option>`).join('')}</select></div><div class="field"><label for="minimum-input">Min. value (selected currency)</label><input id="minimum-input" type="number" min="0" step="1" data-local="minimum" placeholder="Select currency first" value="${esc(s.minimum)}" ${!s.currency?'disabled':''}></div><label class="check-label"><input type="checkbox" data-toggle="relevantOnly" ${s.relevantOnly?'checked':''}> Company-fit only</label></div>`;
+}
+function filtered(){let items=state.items.filter(n=>!state.currency||n.currency===state.currency);
+ if(state.currency&&Number(state.minimum)>0)items=items.filter(n=>n.value!=null&&n.value>=Number(state.minimum));
+ if(state.status==='candidate')items=items.filter(isBidReadyCandidate);
+ if(state.status==='dated')items=items.filter(n=>n.deadlineAt&&n.deadlineAt>=today());
+ if(state.status==='undated')items=items.filter(n=>!n.deadlineAt);
+ if(state.relevantOnly)items=items.filter(n=>score(n).value>=35);
+ const val=x=>score(x).value??-1;return [...items].sort((a,b)=>state.sort==='fit'?val(b)-val(a):state.sort==='value'?(b.value||0)-(a.value||0):state.sort==='deadline'?(a.deadlineAt||'9999').localeCompare(b.deadlineAt||'9999'):(b.publishedAt||'').localeCompare(a.publishedAt||''));}
+function explore(){const items=filtered(),loaded=state.loaded;let content=state.loading&&!state.items.length?'<div class="loading"><span class="spinner"></span><p>Connecting to official procurement feeds…</p><p class="meta-note">Initial retrieval may take several seconds.</p></div>':state.error&&!state.items.length?empty('No live source returned data',state.error,'alert-circle','<button class="btn primary" data-action="refresh">Retry government feeds</button>'):items.length?items.map(priority).join(''):empty('No matches in retrieved sample','Try a broader search, a different source, or clear local filters. No substitute records have been generated.','search','<button class="btn" data-action="reset-filters">Clear filters</button>');
+ const more=Object.values(state.health).some(h=>h.status==='ok'&&h.hasMore)&&state.page<4;
+ return `${heading('Source-backed discovery','Opportunity finder','Search public registers and assess the evidence behind every notice.',`<button class="btn" data-action="copy-search">${ico('copy')} Share search</button><button class="btn" data-action="csv">${ico('download')} CSV export</button><button class="btn" data-action="json-snapshot">${ico('file-text')} JSON snapshot</button>`)}${filterControls()}${loaded?scopeNotice():''}<div class="results-bar"><div><h2>${state.loading?'Searching publishers…':`${fmtInt(items.length)} notices in view`}</h2><p>${state.fetchedAt?'Latest source check: '+day(state.fetchedAt.slice(0,10))+' · '+Math.round(state.responseMs||0)+' ms':'Search live official data; incomplete sources remain visible'}</p></div><div class="results-actions">${state.compare.length>=2?`<button class="btn soft" data-action="open-compare">${ico('list-checks')} Compare ${state.compare.length}</button>`:''}<button class="btn" data-action="save-search">${ico('radar')} Save monitor</button><button class="btn" data-action="refresh">${ico('refresh-cw')} Refresh</button></div></div><div class="result-box">${content}</div>${more?`<div style="display:flex;justify-content:center;margin-top:20px"><button class="btn" data-action="more" ${state.loading?'disabled':''}>Load another source page ${ico('arrow-right')}</button></div>`:''}<p class="meta-note" style="margin-top:14px">Only records returned by official publishers are displayed. “Source date” is not a verified active bidding status. Currency values are never converted.</p>`;
+}
+function stageCard(x){const n=x.notice||{};return `<article class="stage-card"><button class="title-btn" data-action="dossier" data-id="${esc(x.id)}">${esc(n.title||'Untitled notice')}</button><p class="stage-meta">${esc(sourceName(n.source))} · ${esc(region(n.country))}</p><p class="stage-meta">${esc(n.deadlineAt?`Listed date: ${day(n.deadlineAt)}`:'Deadline not provided')}</p><select data-stage="${esc(x.id)}" aria-label="Pipeline stage">${STAGES.map(([k,l])=>`<option value="${k}" ${x.stage===k?'selected':''}>${esc(l)}</option>`).join('')}</select></article>`}
+function pipeline(){return `${heading('Your bid process','Bid pipeline','Track saved opportunities, qualification decisions and preparation progress.',`<button class="btn" data-action="csv-pipeline">${ico('download')} Export pipeline</button><button class="btn primary" data-view="explore">${ico('plus')} Add opportunity</button>`)}<div class="alert info">${ico('shield-check')} All pipeline records and notes are stored in this browser. Export JSON backups to protect them and transfer between devices; no cloud synchronization is enabled.</div><div class="metric-grid">${metric('Saved notices',store.saved.length,'Saved on this device','bookmark')}${metric('In qualification',store.saved.filter(x=>x.stage==='qualified').length,'Review eligibility and conditions','check-circle')}${metric('Preparing bids',store.saved.filter(x=>x.stage==='preparing').length,'Active bid preparation','file-text')}${metric('Submitted',store.saved.filter(x=>x.stage==='submitted').length,'Manually tracked submissions','arrow-up-right')}</div><div class="stage-columns">${BOARD_STAGES.map(([k,l])=>`<section class="stage"><div class="stage-head"><i></i>${esc(l)}<b>${store.saved.filter(x=>x.stage===k).length}</b></div>${store.saved.filter(x=>x.stage===k).map(stageCard).join('')||'<div class="stage-empty">No saved notices here</div>'}</section>`).join('')}</div>${store.saved.some(x=>x.stage==='won'||x.stage==='lost')?`<section class="card card-pad" style="margin-top:20px"><div class="card-title"><h3>Closed decisions</h3></div>${store.saved.filter(x=>['won','lost'].includes(x.stage)).map(x=>`<div class="statline"><button class="btn ghost" data-action="dossier" data-id="${esc(x.id)}">${esc(x.notice.title)}</button><span class="pill">${x.stage==='won'?'Won':'Not pursued'}</span></div>`).join('')}</section>`:''}`}
+function intelligence(){const items=state.items;const withValue=items.filter(n=>n.value&&n.currency);const valueCounts=counts(withValue,n=>n.currency);const buyers=counts(items,n=>n.buyer||'Buyer not disclosed').filter(([k])=>k!=='Buyer not disclosed');
+ return `${heading('Evidence, not estimates','Market intelligence','Analyzing the actual fetched notice sample — not the entire public procurement market.',`<button class="btn" data-action="refresh">${ico('refresh-cw')} Update sample</button>`)}${state.loaded?scopeNotice():''}<div class="metric-grid">${metric('Source results',state.loaded?fmtInt(items.length):'—','Fetched in current session','file-text')}${metric('Source date coverage',state.loaded?`${Math.round(items.filter(x=>x.deadlineAt).length/Math.max(1,items.length)*100)}%`:'—','Fraction with a date, not verified','calendar')}${metric('Budget disclosure',state.loaded?`${Math.round(withValue.length/Math.max(1,items.length)*100)}%`:'—','Value and currency are supplied','chart-bar')}${metric('Publisher feeds',state.loaded?Object.values(state.health).filter(x=>x.status==='ok').length:'—','Responded in last refresh','server')}</div><div class="two-cols"><section class="card card-pad"><div class="card-title"><div><h3>Markets represented</h3><p>By buyer location in the retrieved sample</p></div>${ico('globe')}</div>${marketBars(items,n=>region(n.country),8)}</section><div class="stack"><section class="card card-pad"><div class="card-title"><div><h3>Sources in this view</h3><p>Do not interpret these as national coverage</p></div></div>${marketBars(items,n=>sourceName(n.source),4)}</section><section class="card card-pad"><div class="card-title"><div><h3>Disclosed currencies</h3><p>Values are never combined across currencies</p></div></div>${valueCounts.length?valueCounts.map(([cur,count])=>`<div class="statline"><span>${esc(cur)}</span><strong>${fmtInt(count)} notices</strong></div>`).join(''):'<p class="subtle">No values with known currency</p>'}</section></div></div><div class="two-cols" style="margin-top:17px"><section class="card card-pad"><div class="card-title"><div><h3>Leading contracting authorities</h3><p>Most repeated buyer names in this sample</p></div></div>${buyers.length?buyers.slice(0,8).map(([name,c],i)=>`<div class="statline"><span><strong style="color:var(--muted);margin-right:14px">${i+1}</strong>${esc(name)}</span><strong>${fmtInt(c)}</strong></div>`).join(''):'<p class="subtle">Buyer names unavailable</p>'}</section><section class="card card-pad"><div class="card-title"><div><h3>Publication activity</h3><p>By source-provided publication date</p></div></div>${marketBars(items,n=>n.publishedAt?.slice(0,7)||'Unknown date',8)}</section></div><section class="card card-pad" style="margin-top:17px"><div class="card-title"><div><h3>Primary CPV category signals</h3><p>First classification supplied per notice; not inferred across multiple lots</p></div></div>${marketBars(items,n=>{const c=String(n.cpv?.[0]||'').replace(/\D/g,'').slice(0,2);return ({'72':'IT & software','45':'Construction','33':'Medical supplies','09':'Energy','71':'Architecture & engineering','79':'Business services','90':'Sanitation & environment','30':'Office equipment'})[c]||(c?'CPV group '+c:'Not supplied')},8)}</section>`;
+}
+function watchlists(){return `${heading('Repeat your best research','Search monitors','Save searches and reopen them instantly. No background scans or email alerts are claimed.',`<button class="btn primary" data-view="explore">${ico('plus')} New search</button>`)}<div class="two-cols"><section class="card card-pad"><div class="card-title"><div><h3>Saved search monitors</h3><p>Stored in this browser, run manually anytime</p></div><span class="pill blue">${store.watchlists.length} monitors</span></div>${store.watchlists.length?store.watchlists.map(w=>`<div class="source-row"><div style="min-width:0;flex:1"><strong>${esc(w.name)}</strong><small>${esc(w.q||'All keywords')} · ${esc(sourceName(w.source)||'All sources')} · ${esc(w.days||30)} days</small></div><button class="btn sm" data-action="run-watch" data-id="${esc(w.id)}">Run</button><button class="btn sm icon-only danger" aria-label="Delete monitor" data-action="delete-watch" data-id="${esc(w.id)}">${ico('close')}</button></div>`).join(''):empty('No saved monitors yet','Configure a search, then save the criteria for the next visit.','radar','<button class="btn primary" data-view="explore">Find opportunities</button>')}</section><section class="card card-pad"><div class="card-title"><div><h3>Create a reusable search</h3><p>Capture your sector and publisher filters</p></div></div><form id="watch-form" class="profile-form"><div class="field"><label for="watch-name">Monitor name</label><input id="watch-name" name="name" maxlength="80" required placeholder="e.g. EU cybersecurity services"></div><div class="field"><label for="watch-keyword">Search keywords</label><input id="watch-keyword" name="q" value="${esc(state.query)}" maxlength="100" placeholder="Keywords or phrase"></div><div class="form-row"><div class="field"><label>Source</label><select name="source"><option value="all">All</option>${Object.entries(SOURCE).map(([k,v])=>`<option value="${k}" ${state.source===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div><div class="field"><label>Days</label><select name="days">${[7,14,30,60,90].map(d=>`<option value="${d}" ${state.days===d?'selected':''}>${d}</option>`).join('')}</select></div></div><button class="btn primary" type="submit">${ico('plus')} Save search monitor</button><p class="help-text">Manual refresh only: automatic emails would require user accounts and a configured email delivery service.</p></form></section></div>`}
+function profile(){const p=store.profile||{};return `${heading('Define your capabilities','Company profile','Make relevance scoring explainable and specific to the services you offer.',`<button class="btn" data-action="reset-profile">Clear profile</button>`)}<div class="two-cols"><section class="card card-pad"><form id="profile-form" class="profile-form"><div class="field"><label for="company-name">Company or team</label><input id="company-name" name="name" value="${esc(p.name)}" placeholder="Your company name" maxlength="100"></div><div class="field"><label for="profile-keywords">Your services & specialties</label><textarea id="profile-keywords" name="keywords" placeholder="e.g. software development, cybersecurity, cloud engineering" rows="4">${esc(p.keywords)}</textarea><p class="help-text">Comma-separated exact terms or short phrases. Matching is heuristic, not a guarantee of eligibility.</p></div><div class="form-row"><div class="field"><label for="profile-cpv">Target CPV categories</label><textarea id="profile-cpv" name="cpv" placeholder="e.g. 72000000, 72262000" rows="3">${esc(p.cpv)}</textarea></div><div class="field"><label for="profile-countries">Target buyer countries (ISO-3)</label><textarea id="profile-countries" name="countries" placeholder="e.g. GRC, DEU, GBR, FRA" rows="3">${esc(p.countries)}</textarea></div></div><div class="field"><label for="profile-exclude">Excluded words</label><input id="profile-exclude" name="exclude" value="${esc(p.exclude)}" placeholder="e.g. military, pharmaceuticals"></div><div class="form-actions"><span class="help-text">Saved on this device only</span><button type="submit" class="btn primary">${ico('check')} Save company profile</button></div></form></section><aside class="stack"><section class="card card-pad"><div class="card-title"><div><h3>Start with a sector</h3><p>Templates fill the form but do not auto-save</p></div></div>${Object.entries({it:'Technology & cloud',construction:'Construction',health:'Healthcare & equipment',energy:'Energy & solar',consulting:'Professional services'}).map(([k,l])=>`<button class="sector-btn" style="width:100%;margin-bottom:7px" data-action="profile-template" data-template="${k}">${ico(k==='it'?'cloud':k==='construction'?'building-2':k==='health'?'heart-pulse':k==='energy'?'zap':'briefcase')}${esc(l)}${ico('chevron-right')}</button>`).join('')}</section><section class="card card-pad"><div class="card-title"><h3>What the fit score means</h3></div><div class="trust-list"><div class="trust-item">${ico('check-circle')}<div><strong>Explainable evidence</strong><p>Title phrases and CPV family matches carry most of the weight. A country match alone never creates a high score.</p></div></div><div class="trust-item">${ico('shield-alert')}<div><strong>Not an award probability</strong><p>Legality, financial eligibility and technical compliance must always be checked in the original documents.</p></div></div></div></section></aside></div>`}
+function sources(){return `${heading('Every number has a source','Data transparency','Understand which publisher responded, the scope sampled, and what is missing.',`<button class="btn" data-action="refresh">${ico('refresh-cw')} Recheck feeds</button>`)}<div class="source-grid">${Object.entries(SOURCE).map(([s,name])=>{const h=state.health[s]||{status:'not-queried',count:0};return `<section class="card source-card"><div class="source-card-head"><h3>${esc(name)}</h3><span class="pill ${h.status==='ok'?'green':h.status==='error'?'red':'gold'}">${esc(h.status||'not-queried')}</span></div><p class="source-note">${esc(h.coverage||h.message||(s==='sam'?'Requires an API key stored as a Cloudflare secret.':'Not queried in current scope.'))}</p><div class="source-stat"><span>Records in this response</span><strong>${fmtInt(h.count||0)}</strong></div><div class="source-stat"><span>Request duration</span><strong>${h.latencyMs!=null?Math.round(h.latencyMs)+' ms':'—'}</strong></div><div class="source-stat"><span>Additional source pages</span><strong>${h.hasMore?'Yes':'Not indicated'}</strong></div><div class="source-stat"><span>Completeness</span><strong>${h.partial?'Partial sample':h.status==='ok'?'Page retrieved':'Not established'}</strong></div><div class="divided-footer"><span class="meta-note">${h.searchMode?esc(h.searchMode):'Publisher-specific access'}</span><a class="inline-link" href="${esc(SOURCE_DOC[s])}" target="_blank" rel="noopener noreferrer">Official docs ${ico('arrow-up-right')}</a></div></section>`}).join('')}</div><section class="card card-pad" style="margin-top:17px"><div class="card-title"><h3>Our evidence standards</h3></div><div class="three-cols"><div class="trust-item">${ico('shield-check')}<div><strong>No invented tenders</strong><p>Unresponsive sources stay unavailable. The dashboard never adds fabricated records to fill gaps.</p></div></div><div class="trust-item">${ico('calendar')}<div><strong>Deadline uncertainty</strong><p>A published date does not guarantee that the procedure is still open or that a time-zone is correct.</p></div></div><div class="trust-item">${ico('info')}<div><strong>Transparent coverage</strong><p>UK keywords search a recent page sample; we do not claim to provide a comprehensive national search.</p></div></div></div></section>`}
+function settings(){return `${heading('Privacy and control','Settings & backup','Control the appearance and protect your local research.',`<a href="/privacy.html" class="btn">${ico('shield-check')} Privacy policy</a>`)}<div class="two-cols"><section class="card card-pad"><div class="card-title"><h3>Appearance & preferences</h3></div><div class="setting-row"><div><strong>Theme</strong><p>Light or dark, with accessible contrasts</p></div><select id="setting-theme"><option value="light" ${store.settings.theme==='light'?'selected':''}>Light</option><option value="dark" ${store.settings.theme==='dark'?'selected':''}>Dark</option></select></div><div class="setting-row"><div><strong>Local data</strong><p>Notes, company profile, saved tenders and monitors remain in this browser</p></div><span class="pill green">On-device</span></div><div class="setting-row"><div><strong>Export your workspace</strong><p>Portable JSON backup that can be restored on another browser</p></div><button class="btn" data-action="backup">${ico('download')} Export JSON</button></div><div class="setting-row"><div><strong>Restore workspace</strong><p>Replaces your currently stored local data after confirmation</p></div><label class="btn" for="backup-import" style="cursor:pointer">${ico('archive')} Select JSON</label><input type="file" id="backup-import" accept="application/json,.json" hidden></div><div class="setting-row"><div><strong>Delete stored research</strong><p>Irreversible unless you previously exported a backup</p></div><button class="btn danger" data-action="clear-data">Erase data</button></div></section><section class="card card-pad"><div class="card-title"><h3>Capability & accuracy</h3></div><div class="trust-list"><div class="trust-item">${ico('server')}<div><strong>Live publisher API</strong><p>Public search is proxied by a Cloudflare Worker; no user API keys are embedded in JavaScript.</p></div></div><div class="trust-item">${ico('radar')}<div><strong>No scheduled alerts</strong><p>Monitors are manual and on-device; no automated email is enabled.</p></div></div><div class="trust-item">${ico('shield-check')}<div><strong>No account or billing claims</strong><p>This direct-upload edition does not provide Stripe checkout, paid plans or cross-device synchronization.</p></div></div><div class="trust-item">${ico('file-text')}<div><strong>Verify before acting</strong><p>Always open the official documents and check eligibility, value, lot scope, dates and local rules.</p></div></div></div></section></div>`}
+function render(){
+ const target=NAV[state.view]?state.view:'overview';state.view=target;
+ $('page-label').textContent=NAV[target];document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('nav-active',el.dataset.view===target));
+ $('page-content').innerHTML=({overview,explore,pipeline,intelligence,watchlists,profile,sources,settings})[target]();chrome();
+}
+function chrome(){const h=Object.entries(state.health);let ok=h.filter(([,s])=>s.status==='ok').length,failed=h.filter(([,s])=>s.status==='error').length;let t=state.loading?'Checking publishers…':state.loaded?`${ok} sources responded${failed?' · partial':''}`:'Not checked';$('live-indicator').classList.toggle('good',ok>0&&!state.loading);$('live-indicator').querySelector('span').textContent=t;$('sidebar-source-state').textContent=t;
+ $('nav-result-count').textContent=state.loaded?String(state.items.length):'—';$('nav-saved-count').textContent=String(store.saved.length);
+}
+function noticeModal(id){const n=notice(id);if(!n){toast('Notice not found in this session');return;}const saved=savedRecord(id),fit=score(n),flags=quality(n);
+ const checks=saved?.checks||{},nChecks=CHECKS.filter(([k])=>checks[k]).length;
+ const value=fit.value!==null?`${fit.value}/90`:'—';
+ const docs=(n.documents||[]).filter(x=>safeUrl(x.url)).map(x=>`<a class="inline-link" href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener noreferrer">${ico('file-text')} ${esc(x.label||'Official document')}</a>`).join(' ');
+ const row=(k,v)=>`<div class="dossier-key"><span>${esc(k)}</span><strong>${esc(v??'Not disclosed')}</strong></div>`;
+ $('notice-dialog-body').innerHTML=`<div class="dialog-header"><div><span class="pill blue">${esc(sourceName(n.source))}</span><span class="pill">Record ${esc(n.noticeId)}</span></div><button class="btn icon-only" aria-label="Close details" data-action="close-dossier">${ico('close')}</button></div><div class="dialog-body"><div class="eyebrow">OFFICIAL-SOURCE OPPORTUNITY DOSSIER</div><h2 class="dossier-title">${esc(n.title)}</h2><div class="tender-meta">${chipState(n)}<span class="pill">${esc(region(n.country))}</span><span class="pill">${esc(n.stage||'unknown')} stage</span></div><div class="dossier-grid"><div><section><div class="card-title" style="margin:18px 0 10px"><h3>Scope & public record</h3></div><p>${esc(n.description||'The publisher returned no detailed description in this search response. Read the original notice and its attachments before relying on this record.')}</p>${docs?`<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:15px">${docs}</div>`:''}${row('Buyer / authority',n.buyer)}${row('Buyer market',region(n.country))}${row('Estimated value (original currency)',money(n))}${row('Published',day(n.publishedAt))}${row('Source deadline',day(n.deadlineAt))}${n.deadlineBasis?row('Date basis',n.deadlineBasis):''}${row('CPV codes',n.cpv?.join(', ')||'Not disclosed')}${row('Notice type',n.noticeType||'Not returned')}${row('Publication source',n.provenance||sourceName(n.source))}</section><section style="margin-top:24px"><div class="card-title"><div><h3>Bid-readiness checklist</h3><p>Manual research steps — not automated eligibility decisions</p></div><span class="pill">${nChecks}/${CHECKS.length}</span></div><div class="check-progress"><div style="width:${nChecks/CHECKS.length*100}%"></div></div><div class="checklist">${CHECKS.map(([key,label])=>`<label><input type="checkbox" data-check="${esc(key)}" data-id="${esc(id)}" ${checks[key]?'checked':''}>${esc(label)}</label>`).join('')}</div></section><section style="margin-top:25px"><div class="card-title"><h3>Research notes</h3></div><div class="field"><textarea id="dossier-notes" rows="5" maxlength="5000" placeholder="Capture bid criteria, responsible team, red flags, and questions…">${esc(saved?.notes||'')}</textarea><p class="help-text">Notes are saved locally, not sent to a server.</p></div><div style="display:flex;gap:9px;margin-top:9px"><button class="btn primary" data-action="save-notes" data-id="${esc(id)}">${ico('check')} Save notes</button>${n.deadlineAt?`<button class="btn" data-action="calendar" data-id="${esc(id)}">${ico('calendar')} Calendar</button>`:''}</div></section></div><aside class="stack"><div class="fit-widget"><div class="eyebrow">EXPLAINABLE COMPANY FIT</div><div class="fit-score">${esc(value)}</div><h3>${esc(fit.confidence)}</h3>${fit.reasons?.length?`<ul>${fit.reasons.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="help-text">Add your services and CPV codes in Company profile to calculate a heuristic fit.</p>'}<p class="help-text">Not a probability of winning or a legal eligibility determination.</p></div><section class="card card-pad"><div class="card-title"><h3>Evidence gaps</h3></div>${flags.length?flags.map(x=>`<div class="statline"><span>${ico('alert-circle')} ${esc(x)}</span></div>`).join(''):'<p class="subtle">Core summary fields present. Always inspect the official documentation.</p>'}</section><section class="card card-pad"><div class="field"><label>Pipeline status</label><select data-stage="${esc(id)}"><option value="unsaved">${saved?'Remove from saved?':'Not in pipeline'}</option>${STAGES.map(([k,l])=>`<option value="${k}" ${saved?.stage===k?'selected':''}>${esc(l)}</option>`).join('')}</select></div></section></aside></div></div><div class="dialog-footer"><div style="display:flex;gap:8px;flex-wrap:wrap">${docsLink(n)}<button class="btn" data-action="toggle-save" data-id="${esc(id)}">${ico('bookmark')} ${saved?'Remove saved':'Save to pipeline'}</button></div><button class="btn soft" data-action="compare" data-id="${esc(id)}">${ico('list-checks')} Compare</button></div>`;
+ if(!$('notice-dialog').open)$('notice-dialog').showModal();
+}
+function compareModal(){const ns=state.compare.map(notice).filter(Boolean);if(ns.length<2){toast('Choose at least two notices to compare');return;}
+ const rows=[['Publisher',n=>sourceName(n.source)],['Buyer',n=>n.buyer||'Not disclosed'],['Country',n=>region(n.country)],['Value (no conversion)',money],['Publication date',n=>day(n.publishedAt)],['Source deadline',n=>day(n.deadlineAt)],['CPV',n=>n.cpv?.join(', ')||'Not supplied'],['Heuristic fit',n=>{const s=score(n);return s.value===null?'Set up profile':`${s.value}/90 · ${s.confidence}`}],['Evidence warnings',n=>quality(n).join('; ')||'None from summary']];
+ $('compare-dialog-body').innerHTML=`<div class="dialog-header"><h2>Opportunity comparison</h2><button class="btn icon-only" aria-label="Close" data-action="close-compare">${ico('close')}</button></div><div class="dialog-body" style="overflow-x:auto"><p class="meta-note">Side-by-side evidence from publishers; currency values are not converted and should not be directly added.</p><table class="compare-table"><tr><th>Field</th>${ns.map(n=>`<td><strong>${esc(n.title)}</strong></td>`).join('')}</tr>${rows.map(([label,fn])=>`<tr><th>${esc(label)}</th>${ns.map(n=>`<td>${esc(fn(n))}</td>`).join('')}</tr>`).join('')}</table></div><div class="dialog-footer"><button class="btn" data-action="clear-compare">Clear selection</button><button class="btn primary" data-action="close-compare">Done</button></div>`;
+ $('compare-dialog').showModal();
+}
+function download(text,name,type='text/plain'){const obj=new Blob([text],{type});const url=URL.createObjectURL(obj);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function csvExport(items,filename='tenderatlas-results.csv'){const keys=['id','source','noticeId','title','buyer','country','publishedAt','deadlineAt','value','currency','cpv','stage','status','url','notes','pipelineStage'];const rows=[keys.map(csvValue).join(',')];for(const item of items){const n=item.notice||item;rows.push(keys.map(k=>csvValue(k==='cpv'?(n.cpv||[]).join('|'):k==='notes'?item.notes||'':k==='pipelineStage'?item.stage||'':n[k]??'')).join(','))}download('\ufeff'+rows.join('\r\n'),filename,'text/csv;charset=utf-8');toast(`Exported ${items.length} records`)}
+function calendar(id){const n=notice(id);if(!n?.deadlineAt){toast('No publisher-provided date available');return;}const d=n.deadlineAt.replaceAll('-','');const next=new Date(n.deadlineAt+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+1);const d2=next.toISOString().slice(0,10).replaceAll('-','');const line=s=>String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/[,;]/g,'\\$&');const event=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TenderAtlas//Research Reminder//EN','BEGIN:VEVENT','UID:'+encodeURIComponent(id)+'@tenderatlas.local','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''),'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+d2,'SUMMARY:'+line('Verify tender deadline: '+n.title),'DESCRIPTION:'+line('Date extracted from public notice. Exact deadline TIME and ZONE NOT VERIFIED. Recheck official source. '+(n.url||'')),'END:VEVENT','END:VCALENDAR'];download(event.join('\r\n'),'tenderatlas-verify-deadline.ics','text/calendar;charset=utf-8')}
+function copySearch(){const u=new URL(location.href);for(const k of ['q','source','country','days','cpv'])u.searchParams.set(k,String(state[k]));u.hash='explore';if(navigator.clipboard?.writeText)navigator.clipboard.writeText(u.href).then(()=>toast('Search URL copied')).catch(()=>toast('Clipboard unavailable'));else toast('Clipboard permission unavailable')}
+let _reqSeq=0,_abortCtrl=null;
+
+export function mergeNoticesByFreshness(existing,incoming){
+ const map=new Map();
+ for(const n of (existing||[])){if(n&&n.id)map.set(n.id,n);}
+ for(const n of (incoming||[])){
+  if(!n||!n.id)continue;
+  const prev=map.get(n.id);
+  if(!prev){map.set(n.id,n);continue;}
+  const prevTs=String(prev.updatedAt||prev.publishedAt||'');
+  const nextTs=String(n.updatedAt||n.publishedAt||'');
+  if(nextTs>=prevTs)map.set(n.id,n);
+ }
+ return Array.from(map.values());
 }
 
-function renderCard(n,opts={}){const saved=savedIds().has(n.id);const deadline=n.deadline?dateFmt(n.deadline):'Not verified';const warning=n.status==='expired'||n.status==='cancelled';const score=state.profile?calculateMatch(n):null;const ai=state.aiResults[n.id];return `<article class="notice-card"><div class="notice-card-inner"><div class="notice-meta"><span class="source-pill ${esc(n.source)}">${esc(n.sourceLabel||n.source)}</span><span class="notice-ref">${esc(n.reference||n.id)}</span><span class="date-meta">${icon('calendar')} ${esc(dateFmt(n.published))}</span></div><a class="notice-title" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a><div class="buyer-line">${icon('building')} ${esc(n.buyer||'Buyer not stated')}</div><div class="notice-tags"><span class="notice-tag status-${esc(deadlineCategory(n))}">${esc(({upcoming:'Upcoming date listed',expired:'Past deadline',cancelled:'Cancelled',archived:'Archived',unknown:'Deadline unverified'})[deadlineCategory(n)])}</span>${daysToListedDeadline(n)!=null&&daysToListedDeadline(n)>=0?`<span class="notice-tag deadline-count">${daysToListedDeadline(n)}d to listed deadline · verify</span>`:''}${n.amended?'<span class="notice-tag">Amended notice</span>':''}${(n.cpv||[]).slice(0,3).map(c=>`<span class="notice-tag">CPV ${esc(c)}</span>`).join('')}</div><div class="notice-facts"><div><span class="fact-label">MARKET</span><span class="fact-value">${esc(n.countryName||'Unspecified')}</span></div><div><span class="fact-label">EST. VALUE</span><span class="fact-value">${esc(euroFmt(n.budget,n.currency))}</span></div><div><span class="fact-label">DEADLINE</span><span class="fact-value ${warning?'warning':''}">${esc(deadline)}</span></div></div></div>${ai?`<div class="match-panel"><div class="match-badge">${Math.round(ai.similarity*100)}<small>/100</small></div><div class="match-detail">AI semantic similarity (BGE-M3), not eligibility or probability of award.</div></div>`:''}${score?`<div class="match-panel"><div class="match-badge">${score.score}<small>/100</small></div><div class="match-detail">Profile relevance · ${esc(score.reasons||'No matching terms observed')}. Eligibility not evaluated.</div></div>`:''}<div class="notice-footer"><div class="notice-footer-left">${icon(n.status==='cancelled'?'alert':'shield')} ${esc(n.status==='cancelled'?'Cancelled in source':n.status==='archived'?'Archived in source':n.status==='expired'?'Published deadline passed':n.deadline?'Deadline from source · verify':t('verify'))}</div><div class="notice-actions"><button class="detail-button" type="button" data-detail="${esc(n.id)}">Details</button>${state.features.aiMatching?`<button class="ai-button" data-ai="${esc(n.id)}" title="AI semantic similarity · paid plan required">${icon('sparkles')} AI fit</button>`:''}<button class="save-button ${saved?'saved':''}" data-save="${esc(n.id)}" title="${saved?'Remove saved notice':'Save notice'}" aria-label="${saved?'Remove saved notice':'Save notice'}">${icon('bookmark')}</button><a class="open-source" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer">${n.source==='khmdhs'?'Open official register':t('open')} ${icon('external')}</a></div></div></article>`;}
-function calculateMatch(n){return scoreRelevance(n,state.profile);}
-function empty(message,details,iconName='inbox'){return `<div class="empty-state">${icon(iconName)}<h3>${esc(message)}</h3><p>${esc(details||'')}</p></div>`;}
-function renderResults(){
-  const list=currentViewItems();
-  $('#results').innerHTML=list.length?list.map(n=>renderCard(n)).join(''):empty(state.items.length?'No notices in this view':t('noResults'),state.items.length?'Try a different in-view status filter or sort.':'Try another keyword, source, country or publication window.','search');
-  updateViewIndicators();
-  const errors=state.sourceErrors||[];
-  $('#source-state').classList.toggle('error-state',errors.length>0);
-  $('#source-state').innerHTML=`<span class="pulse-dot"></span> ${state.sourceMeta.length} responding · ${errors.length} unavailable`;
-  const labels={ted:'EU TED',khmdhs:'ΚΗΜΔΗΣ',uk:'Find a Tender',sam:'SAM.gov'};
-  const ok=state.sourceMeta.map(m=>`<div class="source-row"><div><label>${esc(labels[m.source]||m.source)}</label><small class="source-meta-small">${esc(m.coverage||'')} · ${m.pagesScanned||1} page(s) checked${Number.isFinite(m.durationMs)?` · ${(m.durationMs/1000).toFixed(1)}s`:''}</small></div><span>${Number(m.count)} retrieved</span></div>`).join('');
-  const failed=errors.map(e=>`<div class="source-row is-failed"><div><label>${esc(labels[e.source]||e.source)}</label><small class="source-meta-small">${esc(e.reason)}</small></div><span>Unavailable</span></div>`).join('');
-  const retrieval=$('#retrieval-duration');if(retrieval){const slowest=Math.max(0,...state.sourceMeta.map(x=>x.durationMs||0));retrieval.textContent=state.sourceMeta.length?`Source check · ${((slowest||0)/1000).toFixed(1)}s slowest feed`:'Source check unavailable';}
-  const date=state.queriedAt?new Date(state.queriedAt):null;
-  $('#source-coverage').innerHTML=ok+failed+(ok||failed?`<p class="muted">Checked ${date&&Number.isFinite(date.getTime())?esc(date.toLocaleString(state.lang==='el'?'el-GR':'en-GB')):'just now'}. These counts are not global totals.</p>`:'<p class="muted">No source responded.</p>');
-  $('#saved-count').textContent=String(state.saved.length);
-  renderFocusHighlights();
-  renderIntelligence();
+async function refresh(more=false){const mySeq=++_reqSeq;if(_abortCtrl)_abortCtrl.abort();_abortCtrl=new AbortController();state.loading=true;state.error='';if(!more){state.page=1;state.items=[];state.loaded=false;}chrome();render();const seq=++state.seq;
+ try{const p=new URLSearchParams({q:state.query,source:state.source,country:state.country,days:state.days,page:state.page,cpv:state.cpv});const resp=await fetch('/api/search?'+p,{headers:{Accept:'application/json'},signal:_abortCtrl.signal});const data=await resp.json();if(seq!==state.seq)return;
+  if(!data||!Array.isArray(data.notices)||typeof data.health!=='object')throw Error('Unexpected response schema from /api/search');
+  state.health=data.health;state.fetchedAt=data.fetchedAt;state.responseMs=data.durationMs;state.fromEdgeCache=!!data.fromEdgeCache;
+  const clean=data.notices.filter(n=>n&&n.id&&n.title&&n.source&&SOURCE[n.source]);
+  if(!resp.ok&&clean.length===0){state.items=[];state.error=data.error||`Official sources unavailable (HTTP ${resp.status})`;}else{state.items=more?mergeNoticesByFreshness(state.items,clean):clean;state.error=data.error||'';}
+  state.loaded=true;
+ }catch(e){if(e?.name==='AbortError')return;if(seq===state.seq){state.loaded=true;if(!more)state.items=[];state.error='Unable to retrieve live procurement data: '+(e.message||'Network error');}}
+ finally{if(seq===state.seq){state.loading=false;chrome();render();}}
 }
-function showSourceErrors(errors,partial){const notices=$('#source-notices');if(!errors?.length){notices.innerHTML='';return;}notices.innerHTML=`<div class="notice-strip">${icon('alert')} <span>${partial?'Partial results.':'Search unavailable.'} ${errors.map(e=>`${esc(e.source)}: ${esc(e.reason)}`).join(' · ')}. No substitute records were invented.</span></div>`;}
-async function loadSearch(reset=true){
-  if(state.searching&&!reset)return;
-  if(state.searchAbort)state.searchAbort.abort();
-  const controller=new AbortController();state.searchAbort=controller;
-  const seq=++state.searchSeq;
-  if(reset){state.page=1;state.items=[];state.sourceMeta=[];state.sourceErrors=[];}
-  state.searching=true;
-  if(reset){$('#results').innerHTML=`<div class="loading-placeholder"><span class="spinner"></span> Consulting official procurement registers…</div>`;$('#more-results').hidden=true;}
-  else{$('#more-results').disabled=true;$('#more-results').textContent='Loading next page…';}
-  const params=new URLSearchParams({source:$('#filter-source').value,country:$('#filter-country').value,days:$('#filter-days').value,q:$('#query-input').value.trim(),page:String(state.page)});
-  const share=new URL(location.href);share.search='';share.searchParams.set('q',params.get('q'));share.searchParams.set('source',params.get('source'));share.searchParams.set('country',params.get('country'));share.searchParams.set('days',params.get('days'));
-  history.replaceState(null,'',share.pathname+'?'+share.searchParams.toString());
-  try{
-    const data=await api('/api/search?'+params,{signal:controller.signal});
-    if(seq!==state.searchSeq)return;
-    if(!Array.isArray(data.items))throw Error('Official search returned invalid data');
-    state.items=reset?data.items:[...state.items,...data.items.filter(n=>!state.items.some(x=>x.id===n.id))];
-    state.sourceMeta=(data.sourceMeta||[]).map(m=>({...m,count:state.items.filter(n=>n.source===m.source).length}));state.sourceErrors=data.sourceErrors||[];state.queriedAt=data.queriedAt||null;
-    showSourceErrors(data.sourceErrors,data.partial);
-    if(!data.sourceMeta?.length&&!data.sourceErrors?.length&&data.coverage){$('#source-notices').innerHTML=`<div class="notice-strip info">${esc(data.coverage)}. ${esc(data.disclaimer||'')}</div>`;}
-    renderResults();
-    $('#more-results').hidden=!data.sourceMeta?.some(m=>m.nextPage);
-  }catch(e){
-    if(seq!==state.searchSeq)return;
-    if(e.name==='AbortError')return;
-    state.sourceMeta=[];state.sourceErrors=[];state.queriedAt=null;
-    $('#results').innerHTML=empty(t('fail'),e.message,'alert');$('#source-notices').innerHTML='';
-    $('#source-state').classList.add('error-state');$('#source-state').innerHTML='<span class="pulse-dot"></span> Feed unavailable';
-    $('#stat-count').textContent='—';$('#stat-sources').textContent='0';$('#stat-countries').textContent='—';$('#stat-upcoming').textContent='—';
-    toast(e.message,true);
-  }finally{if(seq===state.searchSeq){state.searching=false;state.searchAbort=null;$('#more-results').disabled=false;$('#more-results').innerHTML=`Load next page ${icon('arrow')}`;}}
+function navigate(view){if(!NAV[view])return;state.view=view;history.replaceState(null,'','#'+view);document.body.classList.remove('nav-open');$('scrim').hidden=true;render();window.scrollTo({top:0,behavior:'instant'});}
+function commandOpen(){const d=$('command-dialog');if(!d.open)d.showModal();$('command-input').value='';commandResults('');$('command-input').focus();}
+function commandResults(q){const needle=q.toLocaleLowerCase();const pages=Object.entries(NAV).filter(([k,v])=>!needle||v.toLocaleLowerCase().includes(needle));const notices=state.items.filter(n=>needle&&`${n.title} ${n.buyer||''}`.toLocaleLowerCase().includes(needle)).slice(0,7);
+ $('command-results').innerHTML=`${pages.map(([k,label])=>`<button class="command-item" data-view="${k}">${ico(k==='overview'?'layout-dashboard':k==='pipeline'?'kanban':k==='intelligence'?'chart-bar':'search')}<span><strong>${esc(label)}</strong><small>Go to workspace</small></span></button>`).join('')}${notices.map(n=>`<button class="command-item" data-action="command-notice" data-id="${esc(n.id)}">${ico('file-text')}<span><strong>${esc(n.title)}</strong><small>${esc(sourceName(n.source))} · ${esc(region(n.country))}</small></span></button>`).join('')}${needle&&!pages.length&&!notices.length?`<button class="command-item" data-action="command-search" data-query="${esc(q)}">${ico('search')} Search publishers for “${esc(q)}”</button>`:''}`;
 }
-function showView(view,scroll=true){if(!['discover','intelligence','saved','alerts','workspace','billing'].includes(view))view='discover';state.view=view;$$('.page-view').forEach(el=>el.classList.toggle('active',el.id===`view-${view}`));$$('[data-view]').forEach(el=>{el.classList.toggle('active',el.dataset.view===view);if(el.tagName==='BUTTON')el.setAttribute('aria-current',el.dataset.view===view?'page':'false');});$('#breadcrumb-view').textContent=t(view);if(scroll)scrollTo({top:0,behavior:'smooth'});const u=new URL(location.href);if(view==='discover')u.searchParams.delete('view');else u.searchParams.set('view',view);history.replaceState(null,'',u.pathname+u.search);if(view==='saved')renderSaved();if(view==='intelligence')renderIntelligence();if(view==='alerts')renderAlerts();if(view==='billing')loadBilling();}
-const GREEK_UI={
-  '.hero h1':'Η επόμενη ευκαιρία σου.<br><em>Ήδη στον ορίζοντα.</em>',
-  '.hero-sub':'Ανακάλυψε δημόσιες συμβάσεις από τις επίσημες πηγές, σύγκρινε προθεσμίες και αξιολόγησε τη συνάφεια για την επιχείρησή σου.',
-  '.hero-search button':`Βρες ευκαιρίες ${icon('arrow')}`, 
-  '#query-input':'Αναζήτηση λογισμικού, κυβερνοασφάλειας, κατασκευών...',
-  '.hero-bottom':'',
-  '.content-heading h2':'Εξερεύνησε προκηρύξεις <span class="result-count" id="result-count"></span>',
-  '.content-heading p':'Προκηρύξεις με τεκμηριωμένες πηγές. Έλεγξε πάντα τους όρους στην επίσημη σελίδα.',
-  '#refresh-btn':`${icon('refresh')} Ανανέωση`,
-  '#filter-source option[value="all"]':'Όλες οι πηγές',
-  '#filter-country option[value=""]':'Όλες οι χώρες',
-  '#filter-days option[value="7"]':'Τελευταίες 7 ημέρες',
-  '#filter-days option[value="30"]':'Τελευταίες 30 ημέρες',
-  '#filter-days option[value="90"]':'Τελευταίες 90 ημέρες',
-  '.filter-apply':`Εφαρμογή φίλτρων ${icon('arrow')}`,
-  '#clear-filters':'Καθαρισμός',
-  '#view-saved .subpage-heading h1':'Αποθηκευμένες ευκαιρίες',
-  '#view-saved .subpage-heading p':'Οργάνωσε τις προκηρύξεις που σε ενδιαφέρουν και επέστρεψε στην επίσημη πηγή όταν είσαι έτοιμος.',
-  '#view-alerts .subpage-heading h1':'Έξυπνες ειδοποιήσεις',
-  '#view-alerts .subpage-heading p':'Παρακολούθησε λέξεις-κλειδιά, αγορές και πηγές. Η αποστολή email απαιτεί ενεργοποιημένο λογαριασμό.',
-  '#view-alerts .simple-grid .white-panel:first-child h3':'Δημιουργία στοχευμένης ειδοποίησης',
-  '#view-alerts .simple-grid .white-panel:last-child h3':'Οι ενεργές ειδοποιήσεις σου',
-  '#alert-form button':`Δημιουργία ειδοποίησης ${icon('arrow')}`,
-  '#view-workspace .subpage-heading h1':'Προφίλ επιχείρησης',
-  '#view-workspace .subpage-heading p':'Περιέγραψε τις υπηρεσίες και τις αγορές που σε ενδιαφέρουν. Η συνάφεια δεν αποτελεί πρόβλεψη ανάθεσης.',
-  '#view-workspace .white-panel:first-child h3':'Στοιχεία επιχείρησης',
-  '#view-workspace .explainer h3':'Πώς λειτουργεί η αντιστοίχιση',
-  '#profile-form button':`Αποθήκευση προφίλ ${icon('arrow')}`,
-  '#view-billing .subpage-heading h1':'Μία πλατφόρμα. Περισσότερες ευκαιρίες.',
-  '#view-billing .subpage-heading p':'Βρες το επόμενο δημόσιο έργο χωρίς πολύπλοκο enterprise λογισμικό.',
-  '#manage-billing':`Διαχείριση στο Stripe ${icon('external')}`,
-  '.billing-account h3':'Η συνδρομή σου',
-  '#more-results':`Επόμενη σελίδα ${icon('arrow')}`,
-  '#login-dialog .dialog-inner h2':'Σύνδεση στον προσωπικό χώρο',
-  '#login-dialog .dialog-inner > p:first-of-type':'Συνδέσου με κωδικό μίας χρήσης μέσω email, χωρίς κωδικό πρόσβασης.',
-  '#email-form button':`Αποστολή κωδικού ${icon('arrow')}`,
-  '#verify-form button[type="submit"]':`Επιβεβαίωση σύνδεσης ${icon('arrow')}`,
-  '#change-email':'Αλλαγή email'
-};
-const originalUi=new Map();
-function translateUi(){for(const [selector,greek] of Object.entries(GREEK_UI)){const el=$(selector);if(!el)continue;if(!originalUi.has(selector))originalUi.set(selector,selector==='#query-input'?el.placeholder:el.innerHTML);if(selector==='#query-input')el.placeholder=state.lang==='el'?greek:originalUi.get(selector);else if(greek)el.innerHTML=state.lang==='el'?greek:originalUi.get(selector);}}
-function applyLanguage(){document.documentElement.lang=state.lang;translateUi();$('#language-toggle').textContent=state.lang==='en'?'EL':'EN';const labels={'.nav-link[data-view="intelligence"] span:last-child':state.lang==='el'?'Ανάλυση αγορών':'Market intelligence','.nav-link[data-view="discover"] span:last-child':t('discover'),'.nav-link[data-view="alerts"] span:last-child':t('alerts'),'.nav-link[data-view="workspace"] span:last-child':t('workspace')};for(const [sel,value] of Object.entries(labels)){const el=$(sel);if(el)el.textContent=value;}$('#breadcrumb-view').textContent=t(state.view);if(state.items.length)renderResults();}
-async function loadAccount(){
-  try{
-    const data=await api('/api/auth/me');state.session=data.authenticated?data:null;
-    if(state.session){
-      $('#sign-in-btn').textContent=`${data.user.email.split('@')[0]} · ${t('signout')}`;
-      await Promise.allSettled([loadSaved(),loadAlerts(),loadProfile()]);
-    }else{
-      $('#sign-in-btn').innerHTML=state.health&&!state.features.accounts?`Guest workspace ${icon('bookmark')}`:`${t('signin')} ${icon('arrow')}`;
-      state.saved=state.guestSaved;state.alerts=[];state.profile=state.localProfile;
-    }
-  }catch(e){console.warn('Account service unavailable:',e.message);state.session=null;state.saved=state.guestSaved;state.profile=state.localProfile;}
-  $('#saved-count').textContent=String(state.saved.length);
-  if(state.view==='saved')renderSaved();if(state.view==='alerts')renderAlerts();if(state.view==='workspace')showProfile();if(state.view==='intelligence')renderIntelligence();
+function setFiltersFromURL(){try{const u=new URL(location.href);if(u.searchParams.has('q'))state.query=u.searchParams.get('q').slice(0,100);if(['all',...Object.keys(SOURCE)].includes(u.searchParams.get('source')))state.source=u.searchParams.get('source');if(/^\w{3}$/.test(u.searchParams.get('country')||''))state.country=u.searchParams.get('country').toUpperCase();if([7,14,30,60,90].includes(+u.searchParams.get('days')))state.days=+u.searchParams.get('days');if(/^\d{8}(?:-\d)?$/.test(u.searchParams.get('cpv')||''))state.cpv=u.searchParams.get('cpv');}catch{}}
+async function act(action,el){const id=el.dataset.id;
+ switch(action){
+ case 'refresh':await refresh();break;
+ case 'dossier':noticeModal(id);break;
+ case 'close-dossier':$('notice-dialog').close();break;
+ case 'close-compare':$('compare-dialog').close();break;
+ case 'toggle-save':toggleSaved(id);if($('notice-dialog').open)noticeModal(id);break;
+ case 'save-notes':{const n=notice(id);if(!n)return;const rec=saveRecord(n);rec.notes=$('dossier-notes')?.value.slice(0,5000)||'';persist();toast('Notes saved locally');noticeModal(id);break}
+ case 'calendar':calendar(id);break;
+ case 'compare':{if(state.compare.includes(id))state.compare=state.compare.filter(k=>k!==id);else if(state.compare.length<3)state.compare.push(id);else return toast('Compare a maximum of three notices');toast(`${state.compare.length} selected for comparison`);render();break}
+ case 'open-compare':compareModal();break;
+ case 'clear-compare':state.compare=[];$('compare-dialog').close();render();break;
+ case 'copy-search':copySearch();break;
+ case 'csv':csvExport(filtered());break;
+ case 'json-snapshot':download(JSON.stringify({generatedAt:new Date().toISOString(),sourceFetchedAt:state.fetchedAt,scope:'Bounded publisher sample, not a full archive',health:state.health,notices:filtered()},null,2),'tenderatlas-source-snapshot.json','application/json');toast('Source-backed JSON snapshot exported');break;
+ case 'csv-pipeline':csvExport(store.saved,'tenderatlas-pipeline.csv');break;
+ case 'save-search':navigate('watchlists');break;
+ case 'sector':state.cpv=el.dataset.cpv;state.query='';navigate('explore');await refresh();break;
+ case 'more':if(state.page<4){state.page++;await refresh(true)}break;
+ case 'reset-filters':Object.assign(state,{currency:'',minimum:'',status:'any',relevantOnly:false,sort:'recent',query:'',country:'',cpv:'',days:30,source:'all'});await refresh();break;
+ case 'run-watch':{const w=store.watchlists.find(x=>x.id===id);if(!w)return;Object.assign(state,{q:w.q,query:w.q||'',source:w.source||'all',days:+w.days||30,country:w.country||'',cpv:w.cpv||''});navigate('explore');await refresh();break;}
+ case 'delete-watch':store.watchlists=store.watchlists.filter(w=>w.id!==id);persist();render();toast('Monitor deleted');break;
+ case 'profile-template':{const p=PRESETS[el.dataset.template];if(!p)return;const f=$('profile-form');for(const k of ['keywords','cpv','countries'])f.elements.namedItem(k).value=p[k];toast('Template inserted. Review and save.');break;}
+ case 'reset-profile':if(confirm('Clear the company profile?')){store.profile=emptyStore().profile;persist();render();toast('Profile cleared')}break;
+ case 'backup':download(JSON.stringify({version:'10.6.0',exportedAt:new Date().toISOString(),...store},null,2),'tenderatlas-backup.json','application/json');break;
+ case 'clear-data':if(confirm('Permanently clear all local TenderAtlas data? Export a backup first.')){store=emptyStore();try{localStorage.removeItem(V9);localStorage.removeItem(V8);localStorage.removeItem(V7);localStorage.removeItem('tenderatlas.workspace.backup.v10_4');localStorage.removeItem('tenderatlas.workspace.backup.pre_1041');localStorage.setItem(MIGRATED_FLAG,'1');}catch{}persist();setTheme();render();toast('Local workspace cleared')}break;
+ case 'command-notice':$('command-dialog').close();noticeModal(id);break;
+ case 'command-search':$('command-dialog').close();state.query=el.dataset.query||'';navigate('explore');await refresh();break;
+ }}
+async function restoreFile(file){if(!file)return;if(file.size>2_000_000)return toast('Backup exceeds 2MB limit');try{const obj=JSON.parse(await file.text());if(!Array.isArray(obj.saved)||!Array.isArray(obj.watchlists)||typeof obj.profile!=='object')throw Error('Invalid backup structure');if(!confirm('Replace your existing local workspace with this backup?'))return;
+ const saved=obj.saved.slice(0,300).filter(x=>x&&typeof x.id==='string'&&x.notice?.title&&SOURCE[x.notice.source]).map(x=>({id:x.id,notice:x.notice,stage:STAGES.some(s=>s[0]===x.stage)?x.stage:'new',notes:String(x.notes||'').slice(0,5000),checks:x.checks&&typeof x.checks==='object'?x.checks:{},createdAt:x.createdAt||new Date().toISOString()}));
+ store={saved,watchlists:obj.watchlists.slice(0,45).filter(x=>x?.id&&x?.name),profile:{...emptyStore().profile,...obj.profile},settings:{theme:obj.settings?.theme==='dark'?'dark':'light',dense:false}};persist();setTheme();render();toast('Workspace backup restored');}catch(e){toast('Import failed: '+e.message)}}
+function wire(){document.querySelectorAll('[data-icon]').forEach(x=>{x.innerHTML=ico(x.dataset.icon)});
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){e.preventDefault();navigate(b.dataset.view);if($('command-dialog').open)$('command-dialog').close();return;}const a=e.target.closest('[data-action]');if(a){e.preventDefault();act(a.dataset.action,a).catch(x=>toast(x.message||'Action failed'));return;}});
+ $('menu-btn').addEventListener('click',()=>{document.body.classList.toggle('nav-open');$('scrim').hidden=!document.body.classList.contains('nav-open')});$('scrim').addEventListener('click',()=>{document.body.classList.remove('nav-open');$('scrim').hidden=true});
+ $('global-search').addEventListener('click',commandOpen);$('command-input').addEventListener('input',e=>commandResults(e.target.value));$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter'){$('command-results').querySelector('button')?.click()}});
+ $('theme-btn').addEventListener('click',()=>{store.settings.theme=store.settings.theme==='dark'?'light':'dark';persist();setTheme()});
+ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();commandOpen();}if(e.key==='Escape'&&document.body.classList.contains('nav-open')){document.body.classList.remove('nav-open');$('scrim').hidden=true;}});
+ document.addEventListener('submit',e=>{const f=e.target;if(!['filter-form','profile-form','watch-form'].includes(f.id))return;e.preventDefault();const x=new FormData(f);
+ if(f.id==='filter-form'){state.query=String(x.get('q')||'').trim().slice(0,100);state.source=String(x.get('source')||'all');state.country=String(x.get('country')||'');state.days=+x.get('days')||30;const cpv=String(x.get('cpv')||'').trim();if(cpv&&!/^\d{8}(?:-\d)?$/.test(cpv))return toast('CPV must contain exactly 8 digits (optional check digit).');state.cpv=cpv;refresh();}
+ if(f.id==='profile-form'){store.profile=Object.fromEntries(['name','keywords','cpv','countries','exclude'].map(k=>[k,String(x.get(k)||'').slice(0,1200)]));persist();render();toast('Company profile saved locally');}
+ if(f.id==='watch-form'){const name=String(x.get('name')||'').trim().slice(0,80);if(!name)return toast('Monitor needs a name');store.watchlists.unshift({id:makeId(),name,q:String(x.get('q')||'').slice(0,100),source:String(x.get('source')||'all'),days:+x.get('days')||30,country:state.country,cpv:state.cpv,createdAt:new Date().toISOString()});store.watchlists=store.watchlists.slice(0,45);persist();render();toast('Manual search monitor saved locally');}
+ });
+ document.addEventListener('change',e=>{
+ const el=e.target;if(el.dataset.local){state[el.dataset.local]=el.value;render();return;}
+ if(el.dataset.toggle){state[el.dataset.toggle]=el.checked;render();return;}
+ if(el.dataset.stage){const id=el.dataset.stage;const n=notice(id);if(!n)return;if(el.value==='unsaved'){if(confirm('Remove this notice from your saved pipeline?')){store.saved=store.saved.filter(x=>x.id!==id);persist();render();if($('notice-dialog').open)noticeModal(id)}return;}const rec=saveRecord(n);rec.stage=el.value;persist();toast('Bid stage updated locally');if(state.view==='pipeline')render();if($('notice-dialog').open)noticeModal(id);return;}
+ if(el.dataset.check){const n=notice(el.dataset.id);if(!n)return;const rec=saveRecord(n);rec.checks[el.dataset.check]=el.checked;persist();const d=$('notice-dialog');if(d.open)noticeModal(n.id);toast('Readiness checklist saved');return;}
+ if(el.id==='setting-theme'){store.settings.theme=el.value==='dark'?'dark':'light';persist();setTheme();render();return;}
+ if(el.id==='backup-import'){restoreFile(el.files?.[0]);return;}
+ });
+ for(const id of ['notice-dialog','compare-dialog','command-dialog'])$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).close()});
+ window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(NAV[v]&&state.view!==v)navigate(v)});
 }
-async function loadSaved(){const res=await api('/api/account/watchlist');state.saved=res.items;$('#saved-count').textContent=String(res.items.length);}
-async function loadAlerts(){const res=await api('/api/alerts');state.alerts=res.items;}
-async function loadProfile(){const res=await api('/api/account/profile');state.profile=res.profile;showProfile();}
-function showProfile(){const p=state.profile;$('#profile-storage-note').textContent=state.session?'Signed-in profile: stored in your account when server storage is configured.':'Device-only profile: stored in this browser. Clearing browser data removes it. No account or email required.';if(!p)return;$('#profile-name').value=p.name||'';$('#profile-description').value=p.description||'';$('#profile-keywords').value=(p.keywords||[]).join(', ');$('#profile-cpvs').value=(p.cpvCodes||[]).join(', ');$('#profile-countries').value=(p.countries||[]).join(', ');}
-function renderSaved(){
-  const el=$('#saved-content'),counts=pipelineCounts(state.saved,state.pipelineStages);
-  const filter=$('#saved-stage-filter').value;
-  const items=state.saved.filter(n=>filter==='all'||(state.pipelineStages[n.noticeId]||'review')===filter);
-  $('#saved-pipeline-count').textContent=`${items.length} shown · ${counts.all} saved`;
-  const note='<div class="guest-note">Pipeline stages are stored in this browser only, including when you sign in. A saved item links to its original publisher; use the official documents to validate every condition.</div>';
-  if(!items.length){el.innerHTML=note+empty(counts.all?'No notices in this stage':'Your shortlist starts here',counts.all?'Change the stage filter to see other opportunities.':'Explore official sources and bookmark an opportunity. You can save locally without an account.','bookmark');return;}
-  const stageOpts=[['review','To review'],['qualified','Qualified'],['bid','Preparing bid'],['pass','Passed']];
-  el.innerHTML=note+`<div class="saved-grid">${items.map(s=>{const stage=state.pipelineStages[s.noticeId]||'review';return `<div class="saved-card"><small>${esc(s.source)} · ${esc(dateFmt(s.notice?.published))}</small><strong>${esc(s.title)}</strong><a href="${esc(safeUrl(s.sourceUrl))}" target="_blank" rel="noopener noreferrer">View original publication ${icon('external')}</a><div class="saved-stage-row"><label>Decision stage <select data-stage-id="${esc(s.noticeId)}" aria-label="Pipeline stage for saved opportunity">${stageOpts.map(([key,label])=>`<option value="${key}" ${stage===key?'selected':''}>${label}</option>`).join('')}</select></label><button data-remove="${esc(s.noticeId)}" type="button">Remove</button></div></div>`;}).join('')}</div>`;
-}
-function renderAlerts(){const el=$('#alerts-content');if(!state.session){el.innerHTML=empty('Email alerts are not yet active',state.health&&!state.features.alerts?'The owner must configure D1, Resend and scheduled delivery first.':'Sign in to save alerts and receive email.','bell');return;}if(!state.alerts.length){el.innerHTML=empty('No alerts configured','Choose a search term and create your first monitoring rule.','bell');return;}el.innerHTML=`<div class="alert-list">${state.alerts.map(a=>`<div class="alert-item"><strong>${esc(a.term)}</strong><small>${esc(a.country||'All markets')} · ${esc(a.source)} · ${a.last_checked_at?'Checked '+esc(new Date(a.last_checked_at*1000).toLocaleDateString()):'Waiting for scheduled delivery'}</small><button data-delete-alert="${esc(a.id)}">Delete</button></div>`).join('')}</div>`;}
-function openNoticeDialog(id){
-  const n=state.items.find(x=>x.id===id);if(!n)return;
-  const cell=(label,val)=>`<div><span>${esc(label)}</span>${esc(val??'Not disclosed')}</div>`;
-  $('#notice-dialog-content').innerHTML=`<div class="notice-dialog-main"><div class="notice-dialog-top"><span class="source-pill ${esc(n.source)}">${esc(n.sourceLabel||n.source)}</span><button id="close-notice" class="icon-button" type="button" aria-label="Close details">${icon('x')}</button></div><h2 class="notice-dialog-title">${esc(n.title)}</h2><div class="buyer-line">${icon('building')} ${esc(n.buyer||'Not listed')}</div><div class="notice-dialog-note">This is a source-backed publication summary, not verification that bidding is currently open. Check the official files for extensions, amendments and eligibility.</div><div class="notice-dialog-facts">${cell('Market',n.countryName)}${cell('Published',dateFmt(n.published))}${cell('Deadline as published',n.deadline?dateFmt(n.deadline):'Not verified')}${cell('Deadline category',deadlineCategory(n))}${cell('Estimated value',euroFmt(n.budget,n.currency))}${cell('Official reference',n.reference)}${cell('Notice type',n.noticeType)}${cell('CPV codes',(n.cpv||[]).join(' · ')||'Not supplied')}${cell('Publisher',n.provenance)}${cell('Amendment signal',n.amended?'Amended — check original notice':'Not identified in feed')}</div><div class="notice-dialog-footer"><a class="primary-button" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer">Open original document ${icon('external')}</a>${n.sourceDetailUrl?`<a class="outline-button" href="${esc(safeUrl(n.sourceDetailUrl))}" target="_blank" rel="noopener noreferrer">Tendering portal ${icon('external')}</a>`:''}</div></div>`;
-  $('#notice-dialog').showModal();$('#close-notice').addEventListener('click',()=>$('#notice-dialog').close());
-}
-function exportResults(){
-  const rows=currentViewItems();if(!rows.length){toast('No records are available to export in this view.');return;}
-  const blob=new Blob([makeCsv(rows)],{type:'text/csv;charset=utf-8'});
-  const u=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=u;a.download=`tenderatlas-${new Date().toISOString().slice(0,10)}.csv`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
-  toast(`${rows.length} sourced record${rows.length===1?'':'s'} exported.`);
-}
-async function copySearch(){
-  const u=new URL(location.href);u.searchParams.delete('view');
-  try{await navigator.clipboard.writeText(u.href);toast('Search link copied to clipboard.');}
-  catch{toast('Clipboard unavailable. Copy the address from your browser.',true);}
-}
-async function loadHealth(){
-  try{state.health=await api('/api/health');state.features=state.health.features||{};
-    const sam=$('#filter-source option[value="sam"]');if(sam){sam.disabled=!state.features.samGov;sam.textContent=state.features.samGov?'USA · SAM.gov':'USA · SAM.gov (requires API key)';}
-    if(!state.features.accounts){$('#sign-in-btn').title='Guest bookmarks are local-only. Sign-in requires D1 and email setup.';}
-    if(!state.features.alerts){const b=$('#alert-form button[type=submit]');if(b){b.disabled=true;b.title='Email delivery requires D1, Resend and scheduler configuration';}}
-  }catch(e){console.warn('Health endpoint unavailable:',e.message);}
-}
-function openLogin(){if(state.health&&!state.features.accounts){toast('Account sign-in is not configured yet. You can save notices on this device.');return;}const dialog=$('#login-dialog');$('#email-form').hidden=false;$('#verify-form').hidden=true;$('#auth-feedback').textContent='';dialog.showModal();$('#login-email').focus();}
-async function handleAi(id){if(state.health&&!state.features.aiMatching)return toast('AI analysis is not yet enabled on this deployment.');if(!state.session){openLogin();return;}if((state.session.tier||'free')==='free'){showView('billing');toast('Upgrade to unlock AI semantic matching.');return;}const notice=state.items.find(x=>x.id===id);if(!notice)return;try{toast('Analyzing semantic relevance…');const out=await api('/api/match',{method:'POST',body:JSON.stringify({notice})});state.aiResults[id]=out;renderResults();toast('AI similarity calculated. Verify all conditions at the source.');}catch(e){toast(e.message,true);}}
-async function handleSave(id){
-  const notice=state.items.find(x=>x.id===id);
-  const exists=state.saved.find(x=>x.noticeId===id);
-  try{
-    if(!state.session){
-      if(exists){state.guestSaved=state.guestSaved.filter(x=>x.noticeId!==id);toast('Removed from device shortlist.');}
-      else if(notice){
-        const record={noticeId:id,title:notice.title,source:notice.source,sourceUrl:notice.url,notice:{...notice}};
-        state.guestSaved=[record,...state.guestSaved].slice(0,60);toast('Saved on this device. Sign in for cross-device sync once enabled.');
-      }
-      state.saved=state.guestSaved;persistGuestSaved();
-    }else if(exists){await api('/api/account/watchlist',{method:'DELETE',body:JSON.stringify({noticeId:id})});state.saved=state.saved.filter(x=>x.noticeId!==id);toast(t('savedremove'));}
-    else if(notice){await api('/api/account/watchlist',{method:'POST',body:JSON.stringify({notice})});await loadSaved();toast(t('savedok'));}
-    if(state.view==='discover')renderResults();if(state.view==='saved')renderSaved();$('#saved-count').textContent=String(state.saved.length);
-  }catch(e){toast(e.message,true);}
-}
-async function loadBilling(){if(!state.session){$('#billing-status').textContent='Sign in to view your subscription.';return;}try{const b=await api('/api/billing/status');$('#billing-status').textContent=`Current tier: ${b.tier.toUpperCase()} · Billing status: ${b.status}${b.billingConfigured?'':' · Stripe configuration pending'}`;}catch(e){$('#billing-status').textContent=e.message;}}
-async function startCheckout(tier){if(state.health&&!state.features.billing)return toast('Payments are not active. The subscription plans are not available for purchase yet.');if(tier==='free')return toast('The free plan is available without payment.');if(!state.session){openLogin();return;}try{const res=await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({tier})});location.assign(res.url);}catch(e){toast(e.message,true);}}
-function bind(){icons();
-  const mobileFilterButton=$('#toggle-filters');const filterForm=$('#filters');
-  mobileFilterButton.addEventListener('click',()=>{const open=filterForm.classList.toggle('filters-open');mobileFilterButton.setAttribute('aria-expanded',String(open));mobileFilterButton.classList.toggle('active',open);});
-
-  $('#density-toggle').addEventListener('click',()=>{state.density=state.density==='compact'?'comfortable':'compact';try{localStorage.setItem(densityKey,state.density);}catch{}$('#density-toggle').setAttribute('aria-pressed',String(state.density==='compact'));$('#density-toggle').textContent=state.density==='compact'?'Comfortable rows':'Compact rows';renderResults();});
-  $('#filter-valued').addEventListener('change',renderResults);
-  $('#filter-relevant').addEventListener('change',()=>{if($('#filter-relevant').checked&&!state.profile){$('#filter-relevant').checked=false;showView('workspace');toast('Save your company profile to filter relevant opportunities.');return;}renderResults();});
-  $('#command-search').addEventListener('click',()=>{showView('discover',false);$('#query-input').focus();});
-  document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();showView('discover',false);$('#query-input').focus();$('#query-input').select();}});
-  $('#open-intelligence').addEventListener('click',()=>showView('intelligence'));
-  $('#saved-stage-filter').addEventListener('change',renderSaved);
-  document.addEventListener('change',e=>{const selector=e.target.closest('[data-stage-id]');if(!selector)return;const id=selector.dataset.stageId;if(!PIPELINE_STAGES.includes(selector.value))return;state.pipelineStages[id]=selector.value;persistStages();renderSaved();toast('Stage saved on this device.');});
-    $('#filter-status').addEventListener('change',renderResults);
-  $('#filter-sort').addEventListener('change',renderResults);
-  $('#export-results').addEventListener('click',exportResults);
-  $('#copy-search').addEventListener('click',copySearch);
-  $('#notice-dialog').addEventListener('click',e=>{if(e.target.id==='notice-dialog')e.target.close();});
-  $$('#quick-searches button').forEach(btn=>btn.addEventListener('click',()=>{
-    $('#query-input').value=btn.dataset.quick;$$('#quick-searches button').forEach(b=>b.classList.toggle('active',b===btn));loadSearch();
-  }));
-  $$('[data-view]').forEach(el=>el.addEventListener('click',()=>showView(el.dataset.view)));$$('[data-action="open-plans"]').forEach(el=>el.addEventListener('click',()=>showView('billing')));$('#language-toggle').addEventListener('click',()=>{state.lang=state.lang==='en'?'el':'en';localStorage.setItem('ta:lang',state.lang);applyLanguage();});$('#sign-in-btn').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{await api('/api/auth/logout',{method:'POST',body:'{}'});await loadAccount();showView('discover');toast('Signed out securely.');}catch(e){toast(e.message,true);}});$('#close-login').addEventListener('click',()=>$('#login-dialog').close());$('#login-dialog').addEventListener('click',e=>{if(e.target.id==='login-dialog')e.target.close();});$('#hero-search').addEventListener('submit',e=>{e.preventDefault();showView('discover',false);loadSearch();});$('#filters').addEventListener('submit',e=>{e.preventDefault();filterForm.classList.remove('filters-open');mobileFilterButton.setAttribute('aria-expanded','false');mobileFilterButton.classList.remove('active');loadSearch();});$('#refresh-btn').addEventListener('click',()=>loadSearch());$('#clear-filters').addEventListener('click',()=>{$('#query-input').value='';$('#filter-source').value='all';$('#filter-country').value='';$('#filter-days').value='30';$('#filter-status').value='all';$('#filter-sort').value='recent';$('#filter-relevant').checked=false;$('#filter-valued').checked=false;$$('#quick-searches button').forEach(b=>b.classList.remove('active'));loadSearch();});$('#more-results').addEventListener('click',()=>{state.page++;loadSearch(false);});document.addEventListener('click',e=>{const detail=e.target.closest('[data-detail]');if(detail){openNoticeDialog(detail.dataset.detail);return;}const ai=e.target.closest('[data-ai]');if(ai){handleAi(ai.dataset.ai);return;}const save=e.target.closest('[data-save]');if(save){handleSave(save.dataset.save);return;}const rem=e.target.closest('[data-remove]');if(rem){handleSave(rem.dataset.remove);return;}const del=e.target.closest('[data-delete-alert]');if(del){(async()=>{try{await api('/api/alerts',{method:'DELETE',body:JSON.stringify({id:del.dataset.deleteAlert})});await loadAlerts();renderAlerts();toast('Alert deleted.');}catch(e){toast(e.message,true);}})();return;}const tier=e.target.closest('[data-tier]');if(tier)startCheckout(tier.dataset.tier);});$('#email-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#email-form button');el.disabled=true;try{const r=await api('/api/auth/request',{method:'POST',body:JSON.stringify({email:$('#login-email').value.trim()})});state.challengeId=r.challengeId;$('#email-form').hidden=true;$('#verify-form').hidden=false;$('#auth-feedback').textContent='A 6-digit code has been sent. It expires in 10 minutes.';$('#login-code').focus();}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#verify-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('#verify-form button[type=submit]');el.disabled=true;try{await api('/api/auth/verify',{method:'POST',body:JSON.stringify({challengeId:state.challengeId,code:$('#login-code').value.trim()})});$('#login-dialog').close();await loadAccount();toast('Signed in. Your workspace is ready.');}catch(err){$('#auth-feedback').textContent=err.message;}finally{el.disabled=false;}});$('#change-email').addEventListener('click',()=>{$('#verify-form').hidden=true;$('#email-form').hidden=false;$('#auth-feedback').textContent='';});$('#profile-form').addEventListener('submit',async e=>{e.preventDefault();const csv=id=>$(id).value.split(',').map(x=>x.trim()).filter(Boolean);const profile=normalizeLocalProfile({name:$('#profile-name').value.trim(),description:$('#profile-description').value.trim(),keywords:csv('#profile-keywords'),cpvCodes:csv('#profile-cpvs'),countries:csv('#profile-countries').map(x=>x.toUpperCase())});if(!profile||!profile.name){toast('Enter a company name and at least one search criterion.',true);return;}if(!state.session){if(!saveLocalProfile(profile)){toast('Browser storage is unavailable; profile was not saved.',true);return;}state.localProfile=profile;state.profile=profile;showProfile();renderResults();toast('Matching profile saved on this device.');return;}try{await api('/api/account/profile',{method:'PUT',body:JSON.stringify(profile)});await loadProfile();renderResults();toast('Company profile saved. Matching signals updated.');}catch(e){toast(e.message,true);}});$('#alert-form').addEventListener('submit',async e=>{e.preventDefault();if(!state.session){openLogin();return;}try{await api('/api/alerts',{method:'POST',body:JSON.stringify({term:$('#alert-term').value,country:$('#alert-country').value,source:$('#alert-source').value})});await loadAlerts();renderAlerts();$('#alert-term').value='';toast('Alert created. Delivery begins when the scheduler is configured.');}catch(e){toast(e.message,true);}});$('#manage-billing').addEventListener('click',async()=>{if(!state.session){openLogin();return;}try{const r=await api('/api/billing/portal',{method:'POST',body:'{}'});location.assign(r.url);}catch(e){toast(e.message,true);}});}
-(async function init(){
-  state.guestSaved=readGuestSaved();state.saved=state.guestSaved;state.localProfile=readLocalProfile();state.profile=state.localProfile;state.pipelineStages=readLocalStages();state.density=localStorage.getItem(densityKey)==='compact'?'compact':'comfortable';
-  bind();applyLanguage();showProfile();$('#density-toggle').setAttribute('aria-pressed',String(state.density==='compact'));$('#density-toggle').textContent=state.density==='compact'?'Comfortable rows':'Compact rows';
-  const qp=new URLSearchParams(location.search);
-  if(qp.get('q'))$('#query-input').value=qp.get('q').slice(0,80);
-  if(['all','ted','khmdhs','uk','sam'].includes(qp.get('source')))$('#filter-source').value=qp.get('source');
-  if(qp.has('country'))$('#filter-country').value=qp.get('country');
-  if(['7','30','90'].includes(qp.get('days')))$('#filter-days').value=qp.get('days');
-  if(qp.get('view'))showView(qp.get('view'),false);
-  if(qp.get('checkout')==='success')toast('Checkout returned. Access updates after Stripe verifies the subscription.');
-  if(qp.get('checkout')==='canceled')toast('Payment was not completed.');
-  await loadHealth();
-  if($('#filter-source').value==='sam'&&!state.features.samGov)$('#filter-source').value='all';
-  await Promise.allSettled([loadAccount(),loadSearch()]);
-})();
+function init(){setFiltersFromURL();wire();setTheme();const v=location.hash.slice(1);state.view=NAV[v]?v:'overview';render();refresh();}
+if(typeof document!=='undefined'&&document.getElementById?.('page-content'))init();
+if(typeof window!=='undefined'&&typeof navigator!=='undefined'&&'serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+export {csvValue,quality,filtered,store,state};

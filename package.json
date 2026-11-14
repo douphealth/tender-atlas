@@ -1,17 +1,16 @@
 {
   "name": "tender-atlas",
-  "version": "3.0.0",
+  "version": "10.6.0",
   "private": true,
   "type": "module",
-  "description": "TenderAtlas: verified public procurement discovery and subscriptions on Cloudflare Pages",
+  "description": "TenderAtlas v10.6 Cloudflare Pages procurement research",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.js",
-    "check": "npm test && npm run build",
-    "dev": "npx wrangler pages dev public --binding APP_ENV=development"
+    "check": "npm test && npm run build"
   },
   "license": "UNLICENSED"
 }
