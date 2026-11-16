@@ -1,13 +1,13 @@
 # TenderAtlas roadmap
 
 ## Full directory upgrade
-- [ ] Persistent Cloudflare D1 schema, incremental scheduled ingestion, fast indexed search, and live-source fallback
-- [ ] Internal detail pages for all six sources, cross-source reconciliation, and uncapped pagination
-- [ ] Dynamic notice sitemaps, country × CPV hubs, richer structured data, and social cards
-- [ ] Value/deadline filters, EUR normalization, document manifests, and fast search UX
-- [ ] Web dossier intake with spam protection, interactive sample dossier, and optional email delivery
-- [ ] RSS/search alerts, buyer directory/profiles, and optional owner-managed Stripe checkout
-- [ ] Automated tests plus browser verification of primary flows
+- [x] Persistent Cloudflare D1 schema, incremental scheduled ingestion, fast indexed search, and live-source fallback
+- [x] Internal detail pages for all six sources, cross-source reconciliation, and uncapped pagination
+- [x] Dynamic notice sitemaps, country × CPV hubs, richer structured data, and social cards
+- [x] Value/deadline filters, EUR normalization, document manifests, and fast search UX
+- [x] Web dossier intake with spam protection, interactive sample dossier, and optional email delivery
+- [x] RSS/search alerts, buyer directory/profiles, and optional owner-managed Stripe checkout
+- [x] Automated tests plus browser verification of primary flows
 
 ## Owner configuration (code should degrade honestly until supplied)
 - [ ] Contact/notification email and Cloudflare Turnstile keys
