@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { searchTenders } from "@/lib/procurement/api";
-import { countryBySlug, SOURCES } from "@/lib/procurement/catalog";
+import { countryBySlug, CPV_DIVISIONS, SOURCES } from "@/lib/procurement/catalog";
+import { buyerSlug } from "@/lib/procurement/reconcile";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
 import { pageHead } from "@/lib/seo";
 
@@ -40,11 +41,12 @@ function CountryPage() {
         {top.length > 0 && (
           <aside className="rounded-md border border-border bg-card p-5">
             <h2 className="text-lg font-semibold">Most active buyers</h2>
-            <ol className="mt-3 space-y-2 text-sm">{top.map(([b, c]) => <li key={b} className="flex justify-between gap-2"><span className="truncate">{b}</span><span className="font-mono text-muted-foreground">{c}</span></li>)}</ol>
+            <ol className="mt-3 space-y-2 text-sm">{top.map(([b, c]) => <li key={b} className="flex justify-between gap-2"><Link to="/buyers/$slug" params={{ slug: buyerSlug(b) }} className="truncate hover:text-accent">{b}</Link><span className="font-mono text-muted-foreground">{c}</span></li>)}</ol>
             <p className="mt-3 text-xs text-muted-foreground">Counted from the notices on this page only.</p>
           </aside>
         )}
       </div>
+      <section className="mt-12"><h2 className="text-2xl font-semibold">Browse {country.name} by sector</h2><ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{CPV_DIVISIONS.map((d) => <li key={d.code}><Link to="/countries/$code/cpv/$cpv" params={{ code: country.iso2, cpv: d.code }} className="block rounded-sm border border-border bg-card p-3 text-sm hover:bg-secondary"><span className="mr-2 font-mono text-xs text-accent">{d.code.slice(0, 2)}</span>{d.name}</Link></li>)}</ul></section>
     </div>
   );
 }

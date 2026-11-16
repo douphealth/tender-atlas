@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { searchTenders } from "@/lib/procurement/api";
-import { cpvDivision } from "@/lib/procurement/catalog";
+import { COUNTRIES, cpvDivision } from "@/lib/procurement/catalog";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
 import { pageHead } from "@/lib/seo";
 
@@ -8,7 +8,7 @@ export const Route = createFileRoute("/cpv/$code")({
   loader: async ({ params }) => {
     const division = cpvDivision(params.code);
     if (!division) throw notFound(); // only the 45 official divisions get pages
-    const result = await searchTenders({ data: { cpv: division.code, days: 30, only: ["ted", "fr"] } });
+    const result = await searchTenders({ data: { cpv: division.code, days: 30, only: ["ted", "fr", "gr", "uk"] } });
     return { division, result };
   },
   head: ({ loaderData, params }) => loaderData
@@ -30,6 +30,7 @@ function CpvPage() {
       <h1 className="mt-2 text-4xl font-semibold">{division.name}</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">Notices from TED and BOAMP whose CPV classification falls in division {division.code.slice(0, 2)}, published in the last 30 days.</p>
       <div className="mt-8 space-y-3"><TenderList items={result.items} /><SourceHealth result={result} /></div>
+      <section className="mt-12"><h2 className="text-2xl font-semibold">{division.name} by country</h2><ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">{COUNTRIES.filter((c) => c.iso3 !== "USA").map((c) => <li key={c.iso2}><Link to="/countries/$code/cpv/$cpv" params={{ code: c.iso2, cpv: division.code }} className="hover:text-accent">{c.name}</Link></li>)}</ul></section>
     </div>
   );
 }

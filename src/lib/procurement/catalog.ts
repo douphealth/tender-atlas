@@ -8,9 +8,9 @@ export const SOURCES: Record<
   ted: { label: "EU · TED", name: "Tenders Electronic Daily", region: "European Union & EEA", docs: "https://docs.ted.europa.eu/api/latest/search.html", supportsCpv: true, detailPages: true },
   fr: { label: "FR · BOAMP", name: "Bulletin officiel des annonces des marchés publics", region: "France", docs: "https://boamp-datadila.opendatasoft.com/explore/dataset/boamp/api/", supportsCpv: true, detailPages: true },
   wb: { label: "World Bank", name: "World Bank Procurement Notices", region: "Global (World Bank-financed)", docs: "https://search.worldbank.org/api/v2/procnotices", supportsCpv: false, detailPages: true },
-  gr: { label: "GR · KIMDIS", name: "Κεντρικό Ηλεκτρονικό Μητρώο Δημοσίων Συμβάσεων", region: "Greece", docs: "https://cerpp.eprocurement.gov.gr/khmdhs-opendata/help", supportsCpv: true, detailPages: false },
-  uk: { label: "UK · Find a Tender", name: "Find a Tender Service", region: "United Kingdom", docs: "https://www.find-tender.service.gov.uk/Developer/Documentation", supportsCpv: true, detailPages: false },
-  sam: { label: "US · SAM.gov", name: "SAM.gov Contract Opportunities", region: "United States", docs: "https://open.gsa.gov/api/get-opportunities-public-api/", supportsCpv: false, detailPages: false },
+  gr: { label: "GR · KIMDIS", name: "Κεντρικό Ηλεκτρονικό Μητρώο Δημοσίων Συμβάσεων", region: "Greece", docs: "https://cerpp.eprocurement.gov.gr/khmdhs-opendata/help", supportsCpv: true, detailPages: true },
+  uk: { label: "UK · Find a Tender", name: "Find a Tender Service", region: "United Kingdom", docs: "https://www.find-tender.service.gov.uk/Developer/Documentation", supportsCpv: true, detailPages: true },
+  sam: { label: "US · SAM.gov", name: "SAM.gov Contract Opportunities", region: "United States", docs: "https://open.gsa.gov/api/get-opportunities-public-api/", supportsCpv: false, detailPages: true },
 };
 export const SOURCE_KEYS = Object.keys(SOURCES) as SourceKey[];
 export const isSourceKey = (s: string): s is SourceKey => Object.hasOwn(SOURCES, s);
@@ -24,10 +24,10 @@ export const COUNTRIES: { iso2: string; iso3: string; name: string; sources: Sou
   ["lt", "LTU", "Lithuania"], ["lu", "LUX", "Luxembourg"], ["mt", "MLT", "Malta"], ["nl", "NLD", "Netherlands"],
   ["no", "NOR", "Norway"], ["pl", "POL", "Poland"], ["pt", "PRT", "Portugal"], ["ro", "ROU", "Romania"],
   ["sk", "SVK", "Slovakia"], ["si", "SVN", "Slovenia"], ["es", "ESP", "Spain"], ["se", "SWE", "Sweden"],
-  ["ch", "CHE", "Switzerland"], ["is", "ISL", "Iceland"],
+  ["ch", "CHE", "Switzerland"], ["is", "ISL", "Iceland"], ["gb", "GBR", "United Kingdom"], ["us", "USA", "United States"],
 ] as [string, string, string][]).map(([iso2, iso3, name]) => ({
   iso2, iso3, name,
-  sources: (["ted", ...(iso3 === "FRA" ? ["fr"] : []), ...(iso3 === "GRC" ? ["gr"] : [])] as SourceKey[]),
+  sources: (iso3 === "GBR" ? ["uk"] : iso3 === "USA" ? ["sam"] : ["ted", ...(iso3 === "FRA" ? ["fr"] : []), ...(iso3 === "GRC" ? ["gr"] : [])] as SourceKey[]),
 }));
 export const countryBySlug = (slug: string) => COUNTRIES.find((c) => c.iso2 === slug.toLowerCase());
 export const countryByIso3 = (iso3?: string | null) => COUNTRIES.find((c) => c.iso3 === iso3);

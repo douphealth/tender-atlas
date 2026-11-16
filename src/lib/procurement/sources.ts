@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Official public procurement source adapters. Pure fetch-based code: runs on Cloudflare Workers.
 // Rule: the absence of an upstream field is never a license to infer it.
-import { SOURCES, type SourceKey } from "./catalog";
+import { SOURCES, isSourceKey, type SourceKey } from "./catalog";
+import { officialEuroRates, toEur } from "./money";
+import { reconcileNotices } from "./reconcile";
 
 export type Stage = "competition" | "planning" | "award" | "disposal" | "unknown";
 export interface Notice {
@@ -21,6 +23,9 @@ export interface Notice {
   deadlineBasis: string | null;
   value: number | null;
   currency: string | null;
+  /** Indicative conversion using the ECB reference rate; never a publisher-supplied field. */
+  valueEur?: number | null;
+  relatedNotices?: { source: SourceKey; noticeId: string; url: string | null }[];
   cpv: string[];
   description: string | null;
   noticeType: string | null;
@@ -39,6 +44,9 @@ export interface SearchParams {
   days: number;
   page: number;
   cpv: string; // ########-# or ""
+  deadline: "any" | "48h" | "7d";
+  minValueEur?: number | undefined;
+  maxValueEur?: number | undefined;
 }
 export interface SourceHealth {
   status: "ok" | "error" | "not-queried" | "not-configured" | "excluded";
@@ -54,11 +62,17 @@ export interface SearchResult {
   fetchedAt: string;
   durationMs: number;
   params: SearchParams;
+  storage?: "live" | "database";
+  total?: number;
+  pageSize?: number;
+  hasNext?: boolean;
+  euroRatesDate?: string | undefined;
 }
 
 const TIMEOUT = 9000;
 export const ALLOWED_DAYS = [7, 14, 30, 60, 90];
-export const MAX_PAGE = 4;
+// Generous abuse ceiling, not a four-page directory limit. Stored search uses SQL offsets.
+export const MAX_PAGE = 1000;
 
 // ---------- pure helpers ----------
 const CPV_WEIGHTS = [3, 7, 1, 3, 7, 1, 3, 7];
@@ -319,42 +333,51 @@ export async function worldBankNotice(id: string): Promise<Notice | null> {
 }
 
 // ---------- Greece KIMDIS ----------
+function greekMap(n: any): Notice | null {
+  const id = text(n.referenceNumber ?? n.id, 100);
+  if (!id) return null;
+  const doc = `https://cerpp.eprocurement.gov.gr/khmdhs-opendata/notice/attachment/${encodeURIComponent(id)}`;
+  return normalize({
+    source: "gr", noticeId: id, title: n.title || n.objectDetails?.[0]?.shortDescription, buyer: n.organization?.value ?? n.organizationName,
+    country: "GRC", publishedAt: n.submissionDate ?? n.publishedDate, updatedAt: n.lastUpdateDate, deadline: n.finalSubmissionDate,
+    deadlineKind: n.finalSubmissionDate ? "tender" : "unknown", value: n.totalCostWithoutVAT ?? n.totalCost, currency: "EUR",
+    cpv: (n.objectDetails || []).flatMap((o: any) => o.cpvs || o.cpvItems || []), description: n.objectDetails?.[0]?.shortDescription,
+    noticeType: n.procedureType, stage: "competition", status: n.cancelled ? "cancelled" : null,
+    url: `https://cerpp.eprocurement.gov.gr/khmdhs-opendata/notice/${encodeURIComponent(id)}`,
+    documents: [{ label: "KIMDIS official PDF", url: doc }], provenance: "KIMDIS Open Data API",
+  });
+}
 async function greekFeed(p: SearchParams) {
   const body: any = { dateFrom: dayAgo(p.days), dateTo: today() };
   if (p.cpv) body.cpvItems = [p.cpv];
   if (p.q) body.title = p.q;
   const d = await remoteJSON(`https://cerpp.eprocurement.gov.gr/khmdhs-opendata/notice?page=${p.page - 1}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!Array.isArray(d.content)) throw new Error("Unexpected KIMDIS response");
-  const notices = d.content.map((n: any) => {
-    const id = text(n.referenceNumber ?? n.id, 100);
-    if (!id) return null;
-    const doc = `https://cerpp.eprocurement.gov.gr/khmdhs-opendata/notice/attachment/${encodeURIComponent(id)}`;
-    return normalize({
-      source: "gr", noticeId: id, title: n.title || n.objectDetails?.[0]?.shortDescription, buyer: n.organization?.value ?? n.organizationName,
-      country: "GRC", publishedAt: n.submissionDate ?? n.publishedDate, updatedAt: n.lastUpdateDate, deadline: n.finalSubmissionDate,
-      deadlineKind: n.finalSubmissionDate ? "tender" : "unknown", value: n.totalCostWithoutVAT ?? n.totalCost, currency: "EUR",
-      cpv: (n.objectDetails || []).flatMap((o: any) => o.cpvs || o.cpvItems || []), description: n.objectDetails?.[0]?.shortDescription,
-      noticeType: n.procedureType, stage: "competition", status: n.cancelled ? "cancelled" : null, url: doc,
-      documents: [{ label: "KIMDIS official PDF", url: doc }], provenance: "KIMDIS Open Data API",
-    });
-  }).filter(Boolean) as Notice[];
+  const notices = d.content.map(greekMap).filter(Boolean) as Notice[];
   return { notices, total: Number(d.totalElements) || null, coverage: "Greek KIMDIS register; title/CPV filter" };
+}
+export async function greekNotice(id: string): Promise<Notice | null> {
+  if (!/^[\w:./-]{2,100}$/.test(id)) return null;
+  const d = await remoteJSON(`https://cerpp.eprocurement.gov.gr/khmdhs-opendata/notice/${encodeURIComponent(id)}`);
+  return greekMap(d);
 }
 
 // ---------- UK Find a Tender ----------
-async function ukFeed(p: SearchParams) {
-  const qs = new URLSearchParams({ updatedFrom: dayAgo(Math.min(p.days, 14)) + "T00:00:00", updatedTo: today() + "T23:59:59", limit: "100" });
-  const d = await remoteJSON(`https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages?${qs}`);
-  if (!Array.isArray(d.releases)) throw new Error("Unexpected UK OCDS response");
+function httpsDocument(d: any): { label: string; url: string } | null {
+  try {
+    const url = new URL(String(d?.url));
+    return url.protocol === "https:" ? { label: text(d.title ?? d.description, 140) || "Official tender document", url: url.href } : null;
+  } catch { return null; }
+}
+function ukPackageNotices(releases: any[]): Notice[] {
   const byOcid = new Map<string, any[]>();
-  for (const r of d.releases) {
+  for (const r of releases) {
     const k = text(r.ocid || r.id, 130);
     if (k) byOcid.set(k, [...(byOcid.get(k) ?? []), r]);
   }
-  const needle = p.q.toLocaleLowerCase();
-  const notices = [...byOcid.entries()].map(([ocid, rels]) => {
+  return [...byOcid.entries()].map(([ocid, rels]) => {
     const sorted = [...rels].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    const m: any = { tags: [] as string[] };
+    const m: any = { tags: [] as string[], documents: [] as { label: string; url: string }[] };
     for (const r of sorted) {
       const t = r.tender || {};
       m.title = t.title ?? m.title;
@@ -366,6 +389,7 @@ async function ukFeed(p: SearchParams) {
       if (c.length) m.cpv = c;
       m.description = t.description ?? m.description;
       if (Array.isArray(r.tag)) m.tags = r.tag;
+      if (Array.isArray(t.documents)) m.documents = t.documents.map(httpsDocument).filter(Boolean);
       const num = (String(r.id).match(/\d{5,8}-\d{4}/) || [])[0];
       if (num) m.url = `https://www.find-tender.service.gov.uk/Notice/${num}`;
     }
@@ -373,27 +397,51 @@ async function ukFeed(p: SearchParams) {
     return normalize({
       source: "uk", noticeId: ocid, title: m.title || ocid, buyer: m.buyer, country: "GBR", publishedAt: sorted[0]?.date, updatedAt: sorted.at(-1)?.date,
       deadline: m.deadline, deadlineKind: m.deadline ? "tender" : "unknown", value: m.value, currency: m.currency, cpv: m.cpv,
-      description: m.description, noticeType: m.tags.join(", "), stage, status: stage === "award" ? "awarded" : null,
-      url: m.url || "https://www.find-tender.service.gov.uk/Search/Results", provenance: `UK Find a Tender OCDS (${sorted.length} release${sorted.length > 1 ? "s" : ""})`,
+      description: m.description, noticeType: m.tags.join(", "), stage, status: stage === "award" ? "awarded" : null, documents: m.documents,
+      url: m.url || `https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages/${encodeURIComponent(ocid)}`, provenance: `UK Find a Tender OCDS (${sorted.length} release${sorted.length > 1 ? "s" : ""})`,
     });
-  }).filter((n) => !needle || `${n.title} ${n.buyer ?? ""} ${n.description ?? ""}`.toLocaleLowerCase().includes(needle));
+  });
+}
+async function ukFeed(p: SearchParams) {
+  const qs = new URLSearchParams({ updatedFrom: dayAgo(Math.min(p.days, 14)) + "T00:00:00", updatedTo: today() + "T23:59:59", limit: "100" });
+  const d = await remoteJSON(`https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages?${qs}`);
+  if (!Array.isArray(d.releases)) throw new Error("Unexpected UK OCDS response");
+  const needle = p.q.toLocaleLowerCase();
+  const notices = ukPackageNotices(d.releases).filter((n) => !needle || `${n.title} ${n.buyer ?? ""} ${n.description ?? ""}`.toLocaleLowerCase().includes(needle));
   return { notices, total: null, coverage: "Most recent UK releases (sample, keywords matched locally)" };
+}
+export async function ukNotice(id: string): Promise<Notice | null> {
+  if (!/^[a-z0-9-]{3,130}$/.test(id)) return null;
+  const d = await remoteJSON(`https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages/${encodeURIComponent(id)}`);
+  return Array.isArray(d.releases) ? ukPackageNotices(d.releases).find((n) => n.noticeId === id) ?? null : null;
 }
 
 // ---------- SAM.gov ----------
 const usDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${m}/${d}/${y}`; };
+function samMap(n: any): Notice {
+  const documents = Array.isArray(n.resourceLinks) ? n.resourceLinks.map((url: string, index: number) => ({ label: `SAM.gov attachment ${index + 1}`, url })).filter((d: { url: string }) => safeLink(d.url, ["sam.gov"])) : [];
+  return normalize({
+    source: "sam", noticeId: n.noticeId, title: n.title, buyer: n.fullParentPathName || n.department, country: "USA", publishedAt: n.postedDate, updatedAt: n.modifiedDate,
+    deadline: n.responseDeadLine, deadlineKind: "tender", noticeType: n.type, stage: /award/i.test(n.type) ? "award" : "competition",
+    status: n.active === "No" ? "inactive" : null, url: safeLink(n.uiLink, ["sam.gov"]) || `https://sam.gov/opp/${encodeURIComponent(n.noticeId)}/view`, documents,
+    description: n.description && !String(n.description).startsWith("http") ? n.description : null, provenance: "SAM.gov public opportunities API",
+  });
+}
 async function samFeed(p: SearchParams, key?: string) {
   if (!key) return { notices: [] as Notice[], total: null, coverage: "SAM_GOV_API_KEY not configured", disabled: true };
   const params = new URLSearchParams({ api_key: key, postedFrom: usDate(dayAgo(Math.min(90, p.days))), postedTo: usDate(today()), limit: "50", offset: String((p.page - 1) * 50) });
   if (p.q) params.set("title", p.q.slice(0, 70));
   const d = await remoteJSON(`https://api.sam.gov/opportunities/v2/search?${params}`);
   if (!Array.isArray(d.opportunitiesData)) throw new Error("Unexpected SAM.gov response");
-  const notices = d.opportunitiesData.map((n: any) => normalize({
-    source: "sam", noticeId: n.noticeId, title: n.title, buyer: n.fullParentPathName || n.department, country: "USA", publishedAt: n.postedDate,
-    deadline: n.responseDeadLine, deadlineKind: "tender", noticeType: n.type, stage: /award/i.test(n.type) ? "award" : "competition",
-    status: n.active === "No" ? "inactive" : null, url: safeLink(n.uiLink, ["sam.gov"]) || `https://sam.gov/opp/${encodeURIComponent(n.noticeId)}/view`, provenance: "SAM.gov public opportunities API",
-  }));
+  const notices = d.opportunitiesData.map(samMap);
   return { notices, total: Number(d.totalRecords) || null, coverage: "US SAM.gov opportunities" };
+}
+export async function samNotice(id: string, key?: string): Promise<Notice | null> {
+  if (!key || !/^[a-f0-9]{16,64}$/i.test(id)) return null;
+  const params = new URLSearchParams({ api_key: key, noticeid: id, limit: "1" });
+  const d = await remoteJSON(`https://api.sam.gov/opportunities/v2/search?${params}`);
+  const hit = d.opportunitiesData?.find((n: any) => n.noticeId === id);
+  return hit ? samMap(hit) : null;
 }
 
 // ---------- orchestration ----------
@@ -412,7 +460,13 @@ export function parseSearch(input: Record<string, unknown>): SearchParams {
   const days = ALLOWED_DAYS.includes(Number(input["days"])) ? Number(input["days"]) : 30;
   const page = Math.min(MAX_PAGE, Math.max(1, Math.floor(Number(input["page"]) || 1)));
   const cpv = input["cpv"] ? formatCpv(String(input["cpv"])) ?? "" : "";
-  return { q, source, country: /^[A-Z]{3}$/.test(country) ? country : "", days, page, cpv };
+  const deadline = input["deadline"] === "48h" || input["deadline"] === "7d" ? input["deadline"] : "any";
+  const boundedAmount = (key: string) => {
+    if (input[key] == null || input[key] === "") return undefined;
+    const value = Number(input[key]);
+    return Number.isFinite(value) && value >= 0 && value <= 1_000_000_000_000 ? value : undefined;
+  };
+  return { q, source, country: /^[A-Z]{3}$/.test(country) ? country : "", days, page, cpv, deadline, minValueEur: boundedAmount("minValueEur"), maxValueEur: boundedAmount("maxValueEur") };
 }
 
 export async function collect(p: SearchParams, env: Env = {}, only?: SourceKey[]): Promise<SearchResult> {
@@ -440,14 +494,29 @@ export async function collect(p: SearchParams, env: Env = {}, only?: SourceKey[]
     }
     health[x.s] = { status: "ok", count, latencyMs: x.ms, total: x.r.total, coverage: x.r.coverage };
   }
-  items.sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""));
-  return { items, health, fetchedAt: new Date().toISOString(), durationMs: Date.now() - started, params: p };
+  const rates = items.some((n) => n.value != null) ? await officialEuroRates() : null;
+  let visible = items.map((n) => ({ ...n, valueEur: toEur(n.value, n.currency, rates) }));
+  if (p.deadline !== "any") {
+    const now = today();
+    const end = new Date(Date.now() + (p.deadline === "48h" ? 2 : 7) * 86400000).toISOString().slice(0, 10);
+    visible = visible.filter((n) => n.deadlineAt && n.deadlineAt >= now && n.deadlineAt <= end);
+  }
+  if (p.minValueEur != null) visible = visible.filter((n) => n.valueEur != null && n.valueEur >= p.minValueEur!);
+  if (p.maxValueEur != null) visible = visible.filter((n) => n.valueEur != null && n.valueEur <= p.maxValueEur!);
+  visible = reconcileNotices(visible).sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""));
+  return { items: visible, health, fetchedAt: new Date().toISOString(), durationMs: Date.now() - started, params: p, euroRatesDate: rates?.date } as SearchResult;
 }
 
-export async function fetchNotice(source: string, id: string): Promise<Notice | null> {
-  if (source === "ted") return tedNotice(id);
-  if (source === "fr") return boampNotice(id);
-  if (source === "wb") return worldBankNotice(id);
+export async function fetchNotice(source: string, id: string, env: Env = {}): Promise<Notice | null> {
+  if (!isSourceKey(source)) return null;
+  try {
+    if (source === "ted") return await tedNotice(id);
+    if (source === "fr") return await boampNotice(id);
+    if (source === "wb") return await worldBankNotice(id);
+    if (source === "gr") return await greekNotice(id);
+    if (source === "uk") return await ukNotice(id);
+    if (source === "sam") return await samNotice(id, env.SAM_GOV_API_KEY);
+  } catch { return null; }
   return null;
 }
 

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as MethodologyDothtmlRouteImport } from './routes/methodology[.]html'
@@ -17,18 +18,34 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivacyDothtmlRouteImport } from './routes/privacy[.]html'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TendersDotrssRouteImport } from './routes/tenders[.]rss'
+import { Route as AlertsUnsubscribeRouteImport } from './routes/alerts.unsubscribe'
+import { Route as AlertsVerifyRouteImport } from './routes/alerts.verify'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as BuyersIndexRouteImport } from './routes/buyers.index'
+import { Route as BuyersSlugRouteImport } from './routes/buyers.$slug'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CpvIndexRouteImport } from './routes/cpv.index'
 import { Route as CpvCodeRouteImport } from './routes/cpv.$code'
 import { Route as TendersIndexRouteImport } from './routes/tenders.index'
+import { Route as ApiPublicAlertsRouteImport } from './routes/api/public/alerts'
+import { Route as ApiPublicDossierRequestsRouteImport } from './routes/api/public/dossier-requests'
+import { Route as ApiPublicIngestRouteImport } from './routes/api/public/ingest'
 import { Route as CountriesCodeTendersRouteImport } from './routes/countries.$code.tenders'
 import { Route as TendersSourceIdRouteImport } from './routes/tenders.$source.$id'
+import { Route as ApiPublicStripeCheckoutRouteImport } from './routes/api/public/stripe/checkout'
+import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
+import { Route as CountriesCodeCpvCpvRouteImport } from './routes/countries.$code.cpv.$cpv'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -66,6 +83,21 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TendersDotrssRoute = TendersDotrssRouteImport.update({
+  id: '/tenders.rss',
+  path: '/tenders.rss',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsUnsubscribeRoute = AlertsUnsubscribeRouteImport.update({
+  id: '/unsubscribe',
+  path: '/unsubscribe',
+  getParentRoute: () => AlertsRoute,
+} as any)
+const AlertsVerifyRoute = AlertsVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => AlertsRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -74,6 +106,16 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuyersIndexRoute = BuyersIndexRouteImport.update({
+  id: '/buyers/',
+  path: '/buyers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuyersSlugRoute = BuyersSlugRouteImport.update({
+  id: '/buyers/$slug',
+  path: '/buyers/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CountriesIndexRoute = CountriesIndexRouteImport.update({
@@ -96,6 +138,22 @@ const TendersIndexRoute = TendersIndexRouteImport.update({
   path: '/tenders/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAlertsRoute = ApiPublicAlertsRouteImport.update({
+  id: '/api/public/alerts',
+  path: '/api/public/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDossierRequestsRoute =
+  ApiPublicDossierRequestsRouteImport.update({
+    id: '/api/public/dossier-requests',
+    path: '/api/public/dossier-requests',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicIngestRoute = ApiPublicIngestRouteImport.update({
+  id: '/api/public/ingest',
+  path: '/api/public/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CountriesCodeTendersRoute = CountriesCodeTendersRouteImport.update({
   id: '/countries/$code/tenders',
   path: '/countries/$code/tenders',
@@ -106,9 +164,25 @@ const TendersSourceIdRoute = TendersSourceIdRouteImport.update({
   path: '/tenders/$source/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStripeCheckoutRoute = ApiPublicStripeCheckoutRouteImport.update({
+  id: '/api/public/stripe/checkout',
+  path: '/api/public/stripe/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
+  id: '/api/public/stripe/webhook',
+  path: '/api/public/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesCodeCpvCpvRoute = CountriesCodeCpvCpvRouteImport.update({
+  id: '/countries/$code/cpv/$cpv',
+  path: '/countries/$code/cpv/$cpv',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
@@ -116,17 +190,29 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/privacy.html': typeof PrivacyDothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tenders.rss': typeof TendersDotrssRoute
+  '/alerts/unsubscribe': typeof AlertsUnsubscribeRoute
+  '/alerts/verify': typeof AlertsVerifyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
+  '/buyers/$slug': typeof BuyersSlugRoute
   '/cpv/$code': typeof CpvCodeRoute
+  '/buyers/': typeof BuyersIndexRoute
   '/countries/': typeof CountriesIndexRoute
   '/cpv/': typeof CpvIndexRoute
   '/tenders/': typeof TendersIndexRoute
+  '/api/public/alerts': typeof ApiPublicAlertsRoute
+  '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
+  '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
+  '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/countries/$code/cpv/$cpv': typeof CountriesCodeCpvCpvRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
@@ -134,18 +220,30 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/privacy.html': typeof PrivacyDothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tenders.rss': typeof TendersDotrssRoute
+  '/alerts/unsubscribe': typeof AlertsUnsubscribeRoute
+  '/alerts/verify': typeof AlertsVerifyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
+  '/buyers/$slug': typeof BuyersSlugRoute
   '/cpv/$code': typeof CpvCodeRoute
+  '/buyers': typeof BuyersIndexRoute
   '/countries': typeof CountriesIndexRoute
   '/cpv': typeof CpvIndexRoute
   '/tenders': typeof TendersIndexRoute
+  '/api/public/alerts': typeof ApiPublicAlertsRoute
+  '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
+  '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
+  '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/countries/$code/cpv/$cpv': typeof CountriesCodeCpvCpvRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
@@ -153,19 +251,31 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/privacy.html': typeof PrivacyDothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/tenders.rss': typeof TendersDotrssRoute
+  '/alerts/unsubscribe': typeof AlertsUnsubscribeRoute
+  '/alerts/verify': typeof AlertsVerifyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
+  '/buyers/$slug': typeof BuyersSlugRoute
   '/cpv/$code': typeof CpvCodeRoute
+  '/buyers/': typeof BuyersIndexRoute
   '/countries/': typeof CountriesIndexRoute
   '/cpv/': typeof CpvIndexRoute
   '/tenders/': typeof TendersIndexRoute
+  '/api/public/alerts': typeof ApiPublicAlertsRoute
+  '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
+  '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
+  '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/countries/$code/cpv/$cpv': typeof CountriesCodeCpvCpvRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/alerts'
     | '/app'
     | '/methodology'
     | '/methodology.html'
@@ -173,17 +283,29 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/privacy.html'
     | '/sitemap.xml'
+    | '/tenders.rss'
+    | '/alerts/unsubscribe'
+    | '/alerts/verify'
     | '/api/health'
     | '/api/search'
+    | '/buyers/$slug'
     | '/cpv/$code'
+    | '/buyers/'
     | '/countries/'
     | '/cpv/'
     | '/tenders/'
+    | '/api/public/alerts'
+    | '/api/public/dossier-requests'
+    | '/api/public/ingest'
     | '/countries/$code/tenders'
     | '/tenders/$source/$id'
+    | '/api/public/stripe/checkout'
+    | '/api/public/stripe/webhook'
+    | '/countries/$code/cpv/$cpv'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/alerts'
     | '/app'
     | '/methodology'
     | '/methodology.html'
@@ -191,17 +313,29 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/privacy.html'
     | '/sitemap.xml'
+    | '/tenders.rss'
+    | '/alerts/unsubscribe'
+    | '/alerts/verify'
     | '/api/health'
     | '/api/search'
+    | '/buyers/$slug'
     | '/cpv/$code'
+    | '/buyers'
     | '/countries'
     | '/cpv'
     | '/tenders'
+    | '/api/public/alerts'
+    | '/api/public/dossier-requests'
+    | '/api/public/ingest'
     | '/countries/$code/tenders'
     | '/tenders/$source/$id'
+    | '/api/public/stripe/checkout'
+    | '/api/public/stripe/webhook'
+    | '/countries/$code/cpv/$cpv'
   id:
     | '__root__'
     | '/'
+    | '/alerts'
     | '/app'
     | '/methodology'
     | '/methodology.html'
@@ -209,18 +343,30 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/privacy.html'
     | '/sitemap.xml'
+    | '/tenders.rss'
+    | '/alerts/unsubscribe'
+    | '/alerts/verify'
     | '/api/health'
     | '/api/search'
+    | '/buyers/$slug'
     | '/cpv/$code'
+    | '/buyers/'
     | '/countries/'
     | '/cpv/'
     | '/tenders/'
+    | '/api/public/alerts'
+    | '/api/public/dossier-requests'
+    | '/api/public/ingest'
     | '/countries/$code/tenders'
     | '/tenders/$source/$id'
+    | '/api/public/stripe/checkout'
+    | '/api/public/stripe/webhook'
+    | '/countries/$code/cpv/$cpv'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertsRoute: typeof AlertsRouteWithChildren
   AppRoute: typeof AppRoute
   MethodologyRoute: typeof MethodologyRoute
   MethodologyDothtmlRoute: typeof MethodologyDothtmlRoute
@@ -228,14 +374,23 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   PrivacyDothtmlRoute: typeof PrivacyDothtmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TendersDotrssRoute: typeof TendersDotrssRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiSearchRoute: typeof ApiSearchRoute
+  BuyersSlugRoute: typeof BuyersSlugRoute
   CpvCodeRoute: typeof CpvCodeRoute
+  BuyersIndexRoute: typeof BuyersIndexRoute
   CountriesIndexRoute: typeof CountriesIndexRoute
   CpvIndexRoute: typeof CpvIndexRoute
   TendersIndexRoute: typeof TendersIndexRoute
+  ApiPublicAlertsRoute: typeof ApiPublicAlertsRoute
+  ApiPublicDossierRequestsRoute: typeof ApiPublicDossierRequestsRoute
+  ApiPublicIngestRoute: typeof ApiPublicIngestRoute
   CountriesCodeTendersRoute: typeof CountriesCodeTendersRoute
   TendersSourceIdRoute: typeof TendersSourceIdRoute
+  ApiPublicStripeCheckoutRoute: typeof ApiPublicStripeCheckoutRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
+  CountriesCodeCpvCpvRoute: typeof CountriesCodeCpvCpvRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -245,6 +400,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -296,6 +458,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tenders.rss': {
+      id: '/tenders.rss'
+      path: '/tenders.rss'
+      fullPath: '/tenders.rss'
+      preLoaderRoute: typeof TendersDotrssRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alerts/unsubscribe': {
+      id: '/alerts/unsubscribe'
+      path: '/unsubscribe'
+      fullPath: '/alerts/unsubscribe'
+      preLoaderRoute: typeof AlertsUnsubscribeRouteImport
+      parentRoute: typeof AlertsRoute
+    }
+    '/alerts/verify': {
+      id: '/alerts/verify'
+      path: '/verify'
+      fullPath: '/alerts/verify'
+      preLoaderRoute: typeof AlertsVerifyRouteImport
+      parentRoute: typeof AlertsRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -308,6 +491,20 @@ declare module '@tanstack/react-router' {
       path: '/api/search'
       fullPath: '/api/search'
       preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/buyers/': {
+      id: '/buyers/'
+      path: '/buyers'
+      fullPath: '/buyers/'
+      preLoaderRoute: typeof BuyersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/buyers/$slug': {
+      id: '/buyers/$slug'
+      path: '/buyers/$slug'
+      fullPath: '/buyers/$slug'
+      preLoaderRoute: typeof BuyersSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/countries/': {
@@ -338,6 +535,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TendersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/alerts': {
+      id: '/api/public/alerts'
+      path: '/api/public/alerts'
+      fullPath: '/api/public/alerts'
+      preLoaderRoute: typeof ApiPublicAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dossier-requests': {
+      id: '/api/public/dossier-requests'
+      path: '/api/public/dossier-requests'
+      fullPath: '/api/public/dossier-requests'
+      preLoaderRoute: typeof ApiPublicDossierRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ingest': {
+      id: '/api/public/ingest'
+      path: '/api/public/ingest'
+      fullPath: '/api/public/ingest'
+      preLoaderRoute: typeof ApiPublicIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/countries/$code/tenders': {
       id: '/countries/$code/tenders'
       path: '/countries/$code/tenders'
@@ -352,11 +570,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TendersSourceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/stripe/checkout': {
+      id: '/api/public/stripe/checkout'
+      path: '/api/public/stripe/checkout'
+      fullPath: '/api/public/stripe/checkout'
+      preLoaderRoute: typeof ApiPublicStripeCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/stripe/webhook': {
+      id: '/api/public/stripe/webhook'
+      path: '/api/public/stripe/webhook'
+      fullPath: '/api/public/stripe/webhook'
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/$code/cpv/$cpv': {
+      id: '/countries/$code/cpv/$cpv'
+      path: '/countries/$code/cpv/$cpv'
+      fullPath: '/countries/$code/cpv/$cpv'
+      preLoaderRoute: typeof CountriesCodeCpvCpvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AlertsRouteChildren {
+  AlertsUnsubscribeRoute: typeof AlertsUnsubscribeRoute
+  AlertsVerifyRoute: typeof AlertsVerifyRoute
+}
+
+const AlertsRouteChildren: AlertsRouteChildren = {
+  AlertsUnsubscribeRoute: AlertsUnsubscribeRoute,
+  AlertsVerifyRoute: AlertsVerifyRoute,
+}
+
+const AlertsRouteWithChildren =
+  AlertsRoute._addFileChildren(AlertsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertsRoute: AlertsRouteWithChildren,
   AppRoute: AppRoute,
   MethodologyRoute: MethodologyRoute,
   MethodologyDothtmlRoute: MethodologyDothtmlRoute,
@@ -364,14 +617,23 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   PrivacyDothtmlRoute: PrivacyDothtmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TendersDotrssRoute: TendersDotrssRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiSearchRoute: ApiSearchRoute,
+  BuyersSlugRoute: BuyersSlugRoute,
   CpvCodeRoute: CpvCodeRoute,
+  BuyersIndexRoute: BuyersIndexRoute,
   CountriesIndexRoute: CountriesIndexRoute,
   CpvIndexRoute: CpvIndexRoute,
   TendersIndexRoute: TendersIndexRoute,
+  ApiPublicAlertsRoute: ApiPublicAlertsRoute,
+  ApiPublicDossierRequestsRoute: ApiPublicDossierRequestsRoute,
+  ApiPublicIngestRoute: ApiPublicIngestRoute,
   CountriesCodeTendersRoute: CountriesCodeTendersRoute,
   TendersSourceIdRoute: TendersSourceIdRoute,
+  ApiPublicStripeCheckoutRoute: ApiPublicStripeCheckoutRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
+  CountriesCodeCpvCpvRoute: CountriesCodeCpvCpvRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

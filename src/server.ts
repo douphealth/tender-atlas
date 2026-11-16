@@ -48,6 +48,14 @@ function isH3SwallowedErrorBody(body: string): boolean {
 // CompressionStream) or set content-encoding here or in a server route: the body gets encoded
 // twice and renders garbled.
 export default {
+  async scheduled(event: { cron: string }, env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+    const { ingestIncremental, sendDueAlerts } = await import("./lib/scheduled");
+    ctx.waitUntil((async () => {
+      const environment = env as Parameters<typeof ingestIncremental>[0];
+      if (event.cron.startsWith("17")) await ingestIncremental(environment);
+      else await sendDueAlerts(environment);
+    })().catch((error) => console.error("Scheduled TenderAtlas job failed", error)));
+  },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();

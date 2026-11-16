@@ -7,6 +7,7 @@ import { fmtDate, fmtMoney } from "@/components/atlas/format";
 import { pageHead } from "@/lib/seo";
 import { abs } from "@/lib/site";
 import { useWorkspace } from "@/lib/workspace";
+import { buyerSlug } from "@/lib/procurement/reconcile";
 
 export const Route = createFileRoute("/tenders/$source/$id")({
   loader: async ({ params }) => {
@@ -22,13 +23,19 @@ export const Route = createFileRoute("/tenders/$source/$id")({
       description: `${n.buyer ?? "Public buyer"}${where ? `, ${where}` : ""}. ${n.deadlineAt ? `Deadline ${n.deadlineAt}. ` : ""}Official ${SOURCES[n.source].label} notice ${n.noticeId}.`.slice(0, 160),
       path: `/tenders/${n.source}/${n.noticeId}`,
       noindex: !isIndexable(n),
-      jsonLd: {
-        "@context": "https://schema.org", "@type": "BreadcrumbList",
-        itemListElement: [
+      jsonLd: { "@context": "https://schema.org", "@graph": [
+        { "@type": "Demand", name: n.title, description: n.description ?? undefined, url: abs(`/tenders/${n.source}/${n.noticeId}`),
+          datePosted: n.publishedAt ?? undefined, validThrough: n.deadlineAt ?? undefined,
+          seller: n.buyer ? { "@type": "GovernmentOrganization", name: n.buyer, url: abs(`/buyers/${buyerSlug(n.buyer)}`) } : undefined,
+          itemOffered: { "@type": "Service", name: n.title, category: n.cpv.map((c) => `CPV ${c}`) },
+          eligibleRegion: where ? { "@type": "Country", name: where } : undefined,
+          priceSpecification: n.value != null && n.currency ? { "@type": "PriceSpecification", price: n.value, priceCurrency: n.currency } : undefined,
+        },
+        { "@type": "BreadcrumbList", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Tenders", item: abs("/tenders") },
           { "@type": "ListItem", position: 2, name: n.title.slice(0, 80), item: abs(`/tenders/${n.source}/${n.noticeId}`) },
-        ],
-      },
+        ] },
+      ] },
     });
   },
   notFoundComponent: () => (
@@ -64,7 +71,7 @@ function TenderPage() {
       </nav>
       <div className="mt-4 flex flex-wrap items-center gap-3"><StatusPill n={n} /><span className="font-mono text-xs text-muted-foreground">{n.noticeId}</span></div>
       <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-tight sm:text-4xl">{n.title}</h1>
-      <p className="mt-2 text-lg text-muted-foreground">{n.buyer ?? "Contracting authority not disclosed"}</p>
+      <p className="mt-2 text-lg text-muted-foreground">{n.buyer ? <Link to="/buyers/$slug" params={{ slug: buyerSlug(n.buyer) }} className="hover:text-accent hover:underline">{n.buyer}</Link> : "Contracting authority not disclosed"}</p>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {n.url && <a href={n.url} target="_blank" rel="noopener noreferrer" className="rounded-sm bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">Open official notice ↗</a>}
@@ -80,13 +87,14 @@ function TenderPage() {
             <Row k="Country" v={country?.name ?? n.countryName ?? n.country ?? "—"} />
             <Row k="Published" v={fmtDate(n.publishedAt)} />
             <Row k="Deadline" v={n.deadlineAt ? <>{fmtDate(n.deadlineAt)} <span className="text-muted-foreground">({n.deadlineKind === "request" ? "requests to participate" : "tenders"}{n.deadlineTimezone ? `, ${n.deadlineTimezone}` : ""}{n.deadlineBasis ? `; ${n.deadlineBasis}` : ""})</span></> : "Not disclosed"} />
-            <Row k="Estimated value" v={fmtMoney(n.value, n.currency) ?? "Not disclosed"} />
+            <Row k="Estimated value" v={n.value != null ? <>{fmtMoney(n.value, n.currency)}{n.valueEur != null && n.currency !== "EUR" && <span className="block text-xs text-muted-foreground">Approximately {fmtMoney(n.valueEur, "EUR")} using the ECB reference rate; indicative only.</span>}</> : "Not disclosed"} />
             <Row k="Procedure" v={n.procedure ?? "—"} />
             <Row k="Notice type" v={n.noticeType ?? "—"} />
             <Row k="CPV" v={n.cpv.length ? <span className="flex flex-wrap gap-1.5">{n.cpv.map((c) => <Link key={c} to="/cpv/$code" params={{ code: `${c.slice(0, 2)}000000` }} className="rounded-sm bg-secondary px-1.5 font-mono text-xs hover:text-accent" title={cpvDivisionFor(c)?.name}>{c}</Link>)}</span> : "—"} />
           </dl>
           {n.description && (<><h2 className="mt-8 text-xl font-semibold">Description (from the publisher)</h2><p className="mt-3 whitespace-pre-line leading-relaxed">{n.description}</p></>)}
-          {n.documents.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Documents</h2><ul className="mt-3 list-disc pl-5 text-sm">{n.documents.map((d) => <li key={d.url}><a href={d.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">{d.label}</a></li>)}</ul></>)}
+          {n.documents.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Document manifest</h2><p className="mt-1 text-xs text-muted-foreground">Publisher-disclosed links. Files are not mirrored; access requirements and integrity remain controlled by the publisher.</p><ul className="mt-3 space-y-2 text-sm">{n.documents.map((d) => <li key={d.url} className="rounded-sm border border-border p-3"><a href={d.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">{d.label} ↗</a></li>)}</ul></>)}
+          {n.relatedNotices && n.relatedNotices.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Matched official register records</h2><p className="mt-1 text-sm text-muted-foreground">These records matched exactly on buyer, title, country and deadline. Review each official version.</p><ul className="mt-3 space-y-2">{n.relatedNotices.map((r) => <li key={`${r.source}:${r.noticeId}`}><Link to="/tenders/$source/$id" params={{ source: r.source, id: r.noticeId }} className="text-accent underline">{SOURCES[r.source].label} · {r.noticeId}</Link>{r.url && <> · <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground underline">official record ↗</a></>}</li>)}</ul></>)}
         </div>
         <aside className="space-y-6">
           <div className="rounded-md border border-border bg-card p-5">

@@ -4,6 +4,8 @@ const NAV = [
   { to: "/tenders", label: "Tenders" },
   { to: "/countries", label: "Countries" },
   { to: "/cpv", label: "Categories" },
+  { to: "/buyers", label: "Buyers" },
+  { to: "/alerts", label: "Alerts" },
   { to: "/app", label: "Workspace" },
   { to: "/pricing", label: "Dossiers" },
 ] as const;
@@ -42,6 +44,8 @@ export function SiteFooter() {
             <li><Link to="/tenders">Latest tenders</Link></li>
             <li><Link to="/countries">By country</Link></li>
             <li><Link to="/cpv">By CPV category</Link></li>
+            <li><Link to="/buyers">Public buyers</Link></li>
+            <li><Link to="/alerts">Email & RSS alerts</Link></li>
           </ul>
         </div>
         <div className="text-sm">

@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SOURCES } from "@/lib/procurement/catalog";
 import { fmtDate, daysLeft } from "@/components/atlas/format";
 import { pageHead } from "@/lib/seo";
 import { useWorkspace } from "@/lib/workspace";
@@ -36,7 +35,7 @@ function Workspace() {
               return (
                 <li key={n.id} className="grid gap-3 p-4 md:grid-cols-[1fr_10rem_14rem_auto] md:items-center">
                   <div className="min-w-0">
-                    {SOURCES[n.source].detailPages ? <Link to="/tenders/$source/$id" params={{ source: n.source, id: n.noticeId }} className="font-medium hover:underline">{n.title}</Link> : <a href={n.url ?? "#"} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">{n.title} ↗</a>}
+                    <Link to="/tenders/$source/$id" params={{ source: n.source, id: n.noticeId }} className="font-medium hover:underline">{n.title}</Link>
                     <p className="truncate text-sm text-muted-foreground">{n.buyer ?? "Buyer not disclosed"}</p>
                   </div>
                   <div className="text-sm">{fmtDate(n.deadlineAt)}{left != null && left >= 0 && <span className="block text-xs text-accent">{left} days left</span>}</div>
@@ -53,7 +52,7 @@ function Workspace() {
       </section>
       <section className="mt-12">
         <h2 className="text-xl font-semibold">Saved searches</h2>
-        <p className="text-sm text-muted-foreground">Re-run to see what's new. Automatic email alerts are not available yet.</p>
+        <p className="text-sm text-muted-foreground">Re-run to see what's new, or <Link to="/alerts" className="text-accent underline">create a verified email alert</Link>. Every search also has an RSS feed.</p>
         {ws.searches.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">None yet — use “Save this search” on the tenders page.</p> : (
           <ul className="mt-3 space-y-2">{ws.searches.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded-md border border-border bg-card p-3 text-sm">

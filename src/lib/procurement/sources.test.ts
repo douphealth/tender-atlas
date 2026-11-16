@@ -21,7 +21,7 @@ describe("procurement rules", () => {
     expect(mapWorldBankStage("Contract Award").status).toBe("awarded");
   });
   it("clamps search params", () => {
-    expect(parseSearch({ days: "45", page: "99", source: "evil" })).toMatchObject({ days: 30, page: 4, source: "all" });
+    expect(parseSearch({ days: "45", page: "99", source: "evil" })).toMatchObject({ days: 30, page: 99, source: "all" });
   });
   it("builds TED queries with country and CPV", () => {
     expect(tedQuery({ q: "", country: "DEU", days: 7, cpv: "72000000-5" })).toContain("buyer-country = DEU AND classification-cpv = 72000000");
