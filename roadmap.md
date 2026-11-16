@@ -1,5 +1,11 @@
 # TenderAtlas roadmap
 
+## In-context dossier ordering
+- [x] Tender-specific offer, document-backed deliverables, scope, and checkout form
+- [x] Server-validated Stripe price, protected/idempotent orders, and verified payment status
+- [x] Signed webhook fulfilment queue and owner handoff implemented; 44 automated checks and real tender/mobile/prefill browser checks passed
+- [ ] Live activation and real payment verification: blocked on owner Stripe/D1/Turnstile/email configuration and delivery capacity confirmation; dossier preparation, file delivery and refunds remain owner-operated
+
 ## Full directory upgrade
 - [x] Persistent Cloudflare D1 schema, incremental scheduled ingestion, fast indexed search, and live-source fallback
 - [x] Internal detail pages for all six sources, cross-source reconciliation, and uncapped pagination

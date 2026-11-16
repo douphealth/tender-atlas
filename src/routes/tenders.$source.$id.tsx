@@ -8,6 +8,7 @@ import { pageHead } from "@/lib/seo";
 import { abs } from "@/lib/site";
 import { useWorkspace } from "@/lib/workspace";
 import { buyerSlug } from "@/lib/procurement/reconcile";
+import { DossierOrder } from "@/components/atlas/DossierOrder";
 
 export const Route = createFileRoute("/tenders/$source/$id")({
   loader: async ({ params }) => {
@@ -98,15 +99,11 @@ function TenderPage() {
           {n.relatedNotices && n.relatedNotices.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Matched official register records</h2><p className="mt-1 text-sm text-muted-foreground">These records matched exactly on buyer, title, country and deadline. Review each official version.</p><ul className="mt-3 space-y-2">{n.relatedNotices.map((r) => <li key={`${r.source}:${r.noticeId}`}><Link to="/tenders/$source/$id" params={{ source: r.source, id: r.noticeId }} className="text-accent underline">{SOURCES[r.source].label} · {r.noticeId}</Link>{r.url && <> · <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground underline">official record ↗</a></>}</li>)}</ul></>)}
         </div>
         <aside className="space-y-6">
+          <DossierOrder key={n.id} notice={n} />
           <div className="rounded-md border border-border bg-card p-5">
             <h2 className="text-lg font-semibold">Not in the record</h2>
             <p className="mt-1 text-xs text-muted-foreground">We list what is missing rather than guess it.</p>
             <ul className="mt-3 space-y-2 text-sm">{unknowns(n).map((u) => <li key={u} className="border-l-2 border-warning pl-2">{u}</li>)}</ul>
-          </div>
-          <div className="rounded-md bg-ink-deep p-5 text-primary-foreground">
-            <h2 className="text-lg font-semibold">Need a bid/no-bid answer?</h2>
-            <p className="mt-2 text-sm opacity-80">A Readiness Dossier reads the actual tender documents and cites every requirement to its page.</p>
-            <Link to="/pricing" className="mt-4 inline-block rounded-sm bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground">Request a dossier</Link>
           </div>
           <figure><img src={`/og/tenders/${n.source}/${encodeURIComponent(n.noticeId)}.png`} width="1200" height="630" loading="lazy" alt={`TenderAtlas share card for ${n.title}`} className="aspect-[1200/630] w-full rounded-md border border-border object-cover" /><figcaption className="mt-1 text-[11px] text-muted-foreground">Share preview · 1200 × 630</figcaption></figure>
           <p className="font-mono text-[11px] text-muted-foreground">Source: {n.provenance}. Retrieved {n.fetchedAt.slice(0, 16).replace("T", " ")} UTC.{div ? ` Category: ${div.name}.` : ""}</p>

@@ -30,6 +30,7 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Project rules
+- Dossier orders use an owner-managed Stripe REST adapter in `src/lib/dossier`, a migrated D1 order queue and private hashed capability tokens; validate prices and official notice data server-side and mark paid only from matching signed events, because browser redirects and intake IDs are not proof of payment.
 - Keep the app independent: no Lovable Cloud, Supabase or Lovable AI gateway; official publisher adapters live in `src/lib/procurement/sources.ts` and the owner deploys on their own Cloudflare account.
 - Use Cloudflare D1 (`migrations/0001_directory.sql`, `src/lib/procurement/store.ts`) for the optional stored archive and fall back to live official-source search when it is absent or stale; never simulate stored data.
 - Never infer missing notice fields; show them as "not disclosed" — accuracy is the product.
