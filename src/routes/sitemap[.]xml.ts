@@ -11,7 +11,7 @@ export const Route = createFileRoute("/sitemap.xml")({
     const paths = ["/", "/tenders", "/countries", "/cpv", "/buyers", "/alerts", "/methodology", "/pricing", "/privacy",
       ...COUNTRIES.map((c) => `/countries/${c.iso2}/tenders`), ...CPV_DIVISIONS.map((d) => `/cpv/${d.code}`)];
     const [notices, hubs] = await Promise.all([sitemapNoticeRows(db), sitemapHubRows(db)]);
-    const noticeUrls = notices.map((n) => ({ path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}`, lastmod: n.updated_at ?? n.published_at }));
+    const noticeUrls = notices.map((n) => ({ path: `/tenders/${n.source}/${encodeURIComponent(n.notice_id)}`, lastmod: n.updated_at ?? n.published_at }));
     const hubUrls = hubs.flatMap((h) => {
       const country = COUNTRIES.find((c) => c.iso3 === h.country);
       return country && CPV_DIVISIONS.some((d) => d.code === h.division) ? [{ path: `/countries/${country.iso2}/cpv/${h.division}`, lastmod: h.lastmod }] : [];

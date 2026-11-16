@@ -25,6 +25,7 @@ export const Route = createFileRoute("/buyers/$slug")({
 
 function BuyerPage() {
   const { profile: b, storage } = Route.useLoaderData();
+  if (!b) return null;
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <nav className="text-sm text-muted-foreground"><Link to="/buyers" className="hover:text-accent">Buyers</Link> / {b.name}</nav>

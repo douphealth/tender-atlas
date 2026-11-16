@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
 
 const STRIPE_ENABLED = import.meta.env["VITE_STRIPE_ENABLED"] === "true";
@@ -7,7 +7,7 @@ export function DossierForm() {
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
   const [requestId, setRequestId] = useState("");
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);

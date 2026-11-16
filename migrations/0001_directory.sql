@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS notices (
   source TEXT NOT NULL,
   notice_id TEXT NOT NULL,
   title TEXT NOT NULL,
+  description TEXT,
   buyer TEXT,
   buyer_slug TEXT,
   country TEXT,
@@ -28,14 +29,14 @@ CREATE INDEX IF NOT EXISTS notices_buyer_idx ON notices(buyer_slug, published_at
 
 CREATE VIRTUAL TABLE IF NOT EXISTS notices_fts USING fts5(title, buyer, description, content='notices', content_rowid='rowid');
 CREATE TRIGGER IF NOT EXISTS notices_ai AFTER INSERT ON notices BEGIN
-  INSERT INTO notices_fts(rowid, title, buyer, description) VALUES (new.rowid, new.title, new.buyer, json_extract(new.payload, '$.description'));
+  INSERT INTO notices_fts(rowid, title, buyer, description) VALUES (new.rowid, new.title, new.buyer, new.description);
 END;
 CREATE TRIGGER IF NOT EXISTS notices_ad AFTER DELETE ON notices BEGIN
-  INSERT INTO notices_fts(notices_fts, rowid, title, buyer, description) VALUES ('delete', old.rowid, old.title, old.buyer, json_extract(old.payload, '$.description'));
+  INSERT INTO notices_fts(notices_fts, rowid, title, buyer, description) VALUES ('delete', old.rowid, old.title, old.buyer, old.description);
 END;
 CREATE TRIGGER IF NOT EXISTS notices_au AFTER UPDATE ON notices BEGIN
-  INSERT INTO notices_fts(notices_fts, rowid, title, buyer, description) VALUES ('delete', old.rowid, old.title, old.buyer, json_extract(old.payload, '$.description'));
-  INSERT INTO notices_fts(rowid, title, buyer, description) VALUES (new.rowid, new.title, new.buyer, json_extract(new.payload, '$.description'));
+  INSERT INTO notices_fts(notices_fts, rowid, title, buyer, description) VALUES ('delete', old.rowid, old.title, old.buyer, old.description);
+  INSERT INTO notices_fts(rowid, title, buyer, description) VALUES (new.rowid, new.title, new.buyer, new.description);
 END;
 
 CREATE TABLE IF NOT EXISTS dossier_requests (

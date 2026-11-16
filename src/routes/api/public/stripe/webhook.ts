@@ -25,14 +25,14 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
     const raw = await request.text();
     const expected = await hmac(`${timestamp}.${raw}`, secret);
     if (!equal(expected, provided)) return new Response("Invalid signature", { status: 401 });
-    let event: { id?: string; type?: string; data?: { object?: { metadata?: { requestId?: string } } } };
+    let event: { id?: string; type?: string; data?: { object?: { payment_status?: string; metadata?: { requestId?: string } } } };
     try { event = JSON.parse(raw); } catch { return new Response("Invalid JSON", { status: 400 }); }
     if (!event.id || !event.type) return new Response("Invalid event", { status: 400 });
     const existing = await db.prepare("SELECT event_id FROM stripe_events WHERE event_id = ?").bind(event.id).first();
     if (existing) return Response.json({ received: true });
     const statements = [db.prepare("INSERT INTO stripe_events (event_id, event_type, received_at) VALUES (?, ?, ?)").bind(event.id, event.type, new Date().toISOString())];
     const requestId = event.data?.object?.metadata?.requestId;
-    if (event.type === "checkout.session.completed" && requestId) statements.push(db.prepare("UPDATE dossier_requests SET payment_status = 'paid', status = 'paid-queue' WHERE id = ?").bind(requestId));
+    if (event.type === "checkout.session.completed" && event.data?.object?.payment_status === "paid" && requestId) statements.push(db.prepare("UPDATE dossier_requests SET payment_status = 'paid', status = 'paid-queue' WHERE id = ?").bind(requestId));
     await db.batch(statements);
     return Response.json({ received: true });
   } } },

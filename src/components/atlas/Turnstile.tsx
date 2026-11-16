@@ -6,7 +6,7 @@ export function Turnstile() {
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY || document.querySelector('script[data-tenderatlas-turnstile]')) return;
     const script = document.createElement("script");
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
     script.async = true; script.defer = true; script.dataset["tenderatlasTurnstile"] = "true";
     document.head.appendChild(script);
   }, []);

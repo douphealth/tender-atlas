@@ -30,8 +30,9 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Project rules
-- Keep the app independent: no Lovable Cloud, Supabase or Lovable AI gateway; data comes live from official publisher APIs in `src/lib/procurement/sources.ts` — the owner deploys it on their own Cloudflare account.
+- Keep the app independent: no Lovable Cloud, Supabase or Lovable AI gateway; official publisher adapters live in `src/lib/procurement/sources.ts` and the owner deploys on their own Cloudflare account.
+- Use Cloudflare D1 (`migrations/0001_directory.sql`, `src/lib/procurement/store.ts`) for the optional stored archive and fall back to live official-source search when it is absent or stale; never simulate stored data.
 - Never infer missing notice fields; show them as "not disclosed" — accuracy is the product.
-- Only TED, BOAMP and World Bank have internal detail pages (single-record lookups exist); other sources link straight to the official notice.
-- Faceted /tenders URLs are noindex with canonical /tenders; country/CPV pages are noindex under 5 results — prevents thin/duplicate pages.
-- Saved tenders and searches stay in browser localStorage (`src/lib/workspace.ts`) until real accounts exist.
+- Every source has an internal detail page; direct publisher links remain the authoritative record.
+- Faceted /tenders URLs are noindex with canonical /tenders; country/CPV/country-CPV pages are noindex under 5 results — prevents thin/duplicate pages.
+- Saved tenders and searches stay in browser localStorage (`src/lib/workspace.ts`) until real accounts exist; dossier requests and confirmed alerts use owner-managed Cloudflare D1.

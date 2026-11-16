@@ -22,6 +22,7 @@ export const Route = createFileRoute("/tenders/$source/$id")({
       title: n.title.slice(0, 70),
       description: `${n.buyer ?? "Public buyer"}${where ? `, ${where}` : ""}. ${n.deadlineAt ? `Deadline ${n.deadlineAt}. ` : ""}Official ${SOURCES[n.source].label} notice ${n.noticeId}.`.slice(0, 160),
       path: `/tenders/${n.source}/${n.noticeId}`,
+      image: abs(`/og/tenders/${n.source}/${encodeURIComponent(n.noticeId)}.png`),
       noindex: !isIndexable(n),
       jsonLd: { "@context": "https://schema.org", "@graph": [
         { "@type": "Demand", name: n.title, description: n.description ?? undefined, url: abs(`/tenders/${n.source}/${n.noticeId}`),
@@ -107,6 +108,7 @@ function TenderPage() {
             <p className="mt-2 text-sm opacity-80">A Readiness Dossier reads the actual tender documents and cites every requirement to its page.</p>
             <Link to="/pricing" className="mt-4 inline-block rounded-sm bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground">Request a dossier</Link>
           </div>
+          <figure><img src={`/og/tenders/${n.source}/${encodeURIComponent(n.noticeId)}.png`} width="1200" height="630" loading="lazy" alt={`TenderAtlas share card for ${n.title}`} className="aspect-[1200/630] w-full rounded-md border border-border object-cover" /><figcaption className="mt-1 text-[11px] text-muted-foreground">Share preview · 1200 × 630</figcaption></figure>
           <p className="font-mono text-[11px] text-muted-foreground">Source: {n.provenance}. Retrieved {n.fetchedAt.slice(0, 16).replace("T", " ")} UTC.{div ? ` Category: ${div.name}.` : ""}</p>
         </aside>
       </div>

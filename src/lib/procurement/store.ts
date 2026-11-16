@@ -106,14 +106,14 @@ export async function upsertNotices(db: D1Database, notices: Notice[]): Promise<
   if (!notices.length) return 0;
   const now = new Date().toISOString();
   const statements = notices.map((n) => db.prepare(`INSERT INTO notices (
-    id, source, notice_id, title, buyer, buyer_slug, country, published_at, updated_at, deadline_at,
+    id, source, notice_id, title, description, buyer, buyer_slug, country, published_at, updated_at, deadline_at,
     value, currency, value_eur, cpv, status, url, payload, last_seen_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT(id) DO UPDATE SET title=excluded.title, buyer=excluded.buyer, buyer_slug=excluded.buyer_slug,
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(id) DO UPDATE SET title=excluded.title, description=excluded.description, buyer=excluded.buyer, buyer_slug=excluded.buyer_slug,
     country=excluded.country, published_at=excluded.published_at, updated_at=excluded.updated_at,
     deadline_at=excluded.deadline_at, value=excluded.value, currency=excluded.currency, value_eur=excluded.value_eur,
     cpv=excluded.cpv, status=excluded.status, url=excluded.url, payload=excluded.payload, last_seen_at=excluded.last_seen_at`)
-    .bind(n.id, n.source, n.noticeId, n.title, n.buyer, n.buyer ? buyerSlug(n.buyer) : null, n.country, n.publishedAt, n.updatedAt, n.deadlineAt, n.value, n.currency, n.valueEur ?? null, json(n.cpv), n.status, n.url, json(n), now));
+    .bind(n.id, n.source, n.noticeId, n.title, n.description, n.buyer, n.buyer ? buyerSlug(n.buyer) : null, n.country, n.publishedAt, n.updatedAt, n.deadlineAt, n.value, n.currency, n.valueEur ?? null, json(n.cpv), n.status, n.url, json(n), now));
   for (let i = 0; i < statements.length; i += 50) await db.batch(statements.slice(i, i + 50));
   return notices.length;
 }

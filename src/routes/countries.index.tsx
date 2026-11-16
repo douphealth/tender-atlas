@@ -3,7 +3,7 @@ import { COUNTRIES, SOURCES } from "@/lib/procurement/catalog";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/countries/")({
-  head: () => pageHead({ title: "Public tenders by country", description: "Browse live public procurement notices for 30 European countries, read directly from TED, BOAMP and KIMDIS.", path: "/countries" }),
+  head: () => pageHead({ title: "Public tenders by country", description: "Browse official public procurement notices across Europe, the United Kingdom and the United States by country and sector.", path: "/countries" }),
   component: () => (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <p className="eyebrow">Directory</p>

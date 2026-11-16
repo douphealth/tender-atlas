@@ -14,4 +14,9 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+
+  it.each(["/tenders", "/buyers", "/buyers/example-buyer-abc", "/countries/fr/cpv/72000000", "/alerts", "/tenders.rss", "/og/tenders/uk/ocds-h6vhtk-07bc38.png"])("matches the directory route %s", (path) => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+    expect(router.matchRoutes(path).at(-1)?.routeId).not.toBe(rootRouteId);
+  });
 });

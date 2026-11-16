@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cpvMatches, dateOnly, formatCpv, isIndexable, mapWorldBankStage, normalize, parseSearch, tedQuery } from "./sources";
+import { cpvCodes, cpvMatches, dateOnly, formatCpv, isIndexable, mapWorldBankStage, normalize, parseSearch, tedQuery } from "./sources";
 
 describe("procurement rules", () => {
   it("validates CPV check digits", () => {
@@ -9,6 +9,9 @@ describe("procurement rules", () => {
   it("matches CPV families", () => {
     expect(cpvMatches("72212000", "72000000")).toBe(true);
     expect(cpvMatches("45000000", "72000000")).toBe(false);
+  });
+  it("reads CPV values from publisher object fields", () => {
+    expect(cpvCodes([{ id: "72000000" }, { key: "45000000" }, { code: "33000000" }])).toEqual(["72000000", "45000000", "33000000"]);
   });
   it("parses World Bank dd-Mon-yyyy dates", () => {
     expect(dateOnly("14-Nov-2026")).toBe("2026-11-14");
@@ -22,6 +25,10 @@ describe("procurement rules", () => {
   });
   it("clamps search params", () => {
     expect(parseSearch({ days: "45", page: "99", source: "evil" })).toMatchObject({ days: 30, page: 99, source: "all" });
+  });
+  it("accepts the deadline and euro-value filters with bounded amounts", () => {
+    expect(parseSearch({ deadline: "48h", minValueEur: "100000", maxValueEur: "1000000" })).toMatchObject({ deadline: "48h", minValueEur: 100000, maxValueEur: 1000000 });
+    expect(parseSearch({ deadline: "tomorrow", minValueEur: "-1" })).toMatchObject({ deadline: "any", minValueEur: undefined });
   });
   it("builds TED queries with country and CPV", () => {
     expect(tedQuery({ q: "", country: "DEU", days: 7, cpv: "72000000-5" })).toContain("buyer-country = DEU AND classification-cpv = 72000000");

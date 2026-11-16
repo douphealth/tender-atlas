@@ -33,6 +33,7 @@ import { Route as ApiPublicAlertsRouteImport } from './routes/api/public/alerts'
 import { Route as ApiPublicDossierRequestsRouteImport } from './routes/api/public/dossier-requests'
 import { Route as ApiPublicIngestRouteImport } from './routes/api/public/ingest'
 import { Route as CountriesCodeTendersRouteImport } from './routes/countries.$code.tenders'
+import { Route as OgTendersSplatRouteImport } from './routes/og.tenders.$'
 import { Route as TendersSourceIdRouteImport } from './routes/tenders.$source.$id'
 import { Route as ApiPublicStripeCheckoutRouteImport } from './routes/api/public/stripe/checkout'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
@@ -159,6 +160,11 @@ const CountriesCodeTendersRoute = CountriesCodeTendersRouteImport.update({
   path: '/countries/$code/tenders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OgTendersSplatRoute = OgTendersSplatRouteImport.update({
+  id: '/og/tenders/$',
+  path: '/og/tenders/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TendersSourceIdRoute = TendersSourceIdRouteImport.update({
   id: '/tenders/$source/$id',
   path: '/tenders/$source/$id',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
   '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/og/tenders/$': typeof OgTendersSplatRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
   '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
   '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/og/tenders/$': typeof OgTendersSplatRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
   '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/api/public/dossier-requests': typeof ApiPublicDossierRequestsRoute
   '/api/public/ingest': typeof ApiPublicIngestRoute
   '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/og/tenders/$': typeof OgTendersSplatRoute
   '/tenders/$source/$id': typeof TendersSourceIdRoute
   '/api/public/stripe/checkout': typeof ApiPublicStripeCheckoutRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/api/public/dossier-requests'
     | '/api/public/ingest'
     | '/countries/$code/tenders'
+    | '/og/tenders/$'
     | '/tenders/$source/$id'
     | '/api/public/stripe/checkout'
     | '/api/public/stripe/webhook'
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/api/public/dossier-requests'
     | '/api/public/ingest'
     | '/countries/$code/tenders'
+    | '/og/tenders/$'
     | '/tenders/$source/$id'
     | '/api/public/stripe/checkout'
     | '/api/public/stripe/webhook'
@@ -358,6 +369,7 @@ export interface FileRouteTypes {
     | '/api/public/dossier-requests'
     | '/api/public/ingest'
     | '/countries/$code/tenders'
+    | '/og/tenders/$'
     | '/tenders/$source/$id'
     | '/api/public/stripe/checkout'
     | '/api/public/stripe/webhook'
@@ -387,6 +399,7 @@ export interface RootRouteChildren {
   ApiPublicDossierRequestsRoute: typeof ApiPublicDossierRequestsRoute
   ApiPublicIngestRoute: typeof ApiPublicIngestRoute
   CountriesCodeTendersRoute: typeof CountriesCodeTendersRoute
+  OgTendersSplatRoute: typeof OgTendersSplatRoute
   TendersSourceIdRoute: typeof TendersSourceIdRoute
   ApiPublicStripeCheckoutRoute: typeof ApiPublicStripeCheckoutRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -563,6 +576,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CountriesCodeTendersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/og/tenders/$': {
+      id: '/og/tenders/$'
+      path: '/og/tenders/$'
+      fullPath: '/og/tenders/$'
+      preLoaderRoute: typeof OgTendersSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tenders/$source/$id': {
       id: '/tenders/$source/$id'
       path: '/tenders/$source/$id'
@@ -630,6 +650,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicDossierRequestsRoute: ApiPublicDossierRequestsRoute,
   ApiPublicIngestRoute: ApiPublicIngestRoute,
   CountriesCodeTendersRoute: CountriesCodeTendersRoute,
+  OgTendersSplatRoute: OgTendersSplatRoute,
   TendersSourceIdRoute: TendersSourceIdRoute,
   ApiPublicStripeCheckoutRoute: ApiPublicStripeCheckoutRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,

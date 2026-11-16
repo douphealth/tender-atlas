@@ -69,7 +69,7 @@ export interface SearchResult {
   euroRatesDate?: string | undefined;
 }
 
-const TIMEOUT = 9000;
+const TIMEOUT = 20000;
 export const ALLOWED_DAYS = [7, 14, 30, 60, 90];
 // Generous abuse ceiling, not a four-page directory limit. Stored search uses SQL offsets.
 export const MAX_PAGE = 1000;
@@ -195,7 +195,7 @@ async function remoteJSON(url: string, opt: RequestInit = {}): Promise<any> {
   const c = new AbortController();
   const timer = setTimeout(() => c.abort(), TIMEOUT);
   try {
-    const r = await fetch(url, { ...opt, signal: c.signal, headers: { Accept: "application/json", ...(opt.headers || {}) } });
+    const r = await fetch(url, { ...opt, signal: c.signal, headers: { Accept: "application/json", "User-Agent": "TenderAtlas/1.0 (+https://tender-atlas.pages.dev/methodology)", ...(opt.headers || {}) } });
     if (!r.ok) throw new Error(r.status === 429 ? "Rate limited by publisher" : `Publisher HTTP ${r.status}`);
     if (!/json/i.test(r.headers.get("content-type") || "")) throw new Error("Publisher returned non-JSON");
     return await r.json();
@@ -495,7 +495,7 @@ export async function collect(p: SearchParams, env: Env = {}, only?: SourceKey[]
     health[x.s] = { status: "ok", count, latencyMs: x.ms, total: x.r.total, coverage: x.r.coverage };
   }
   const rates = items.some((n) => n.value != null) ? await officialEuroRates() : null;
-  let visible = items.map((n) => ({ ...n, valueEur: toEur(n.value, n.currency, rates) }));
+  let visible: Notice[] = items.map((n) => ({ ...n, valueEur: toEur(n.value, n.currency, rates) }));
   if (p.deadline !== "any") {
     const now = today();
     const end = new Date(Date.now() + (p.deadline === "48h" ? 2 : 7) * 86400000).toISOString().slice(0, 10);
@@ -516,7 +516,10 @@ export async function fetchNotice(source: string, id: string, env: Env = {}): Pr
     if (source === "gr") return await greekNotice(id);
     if (source === "uk") return await ukNotice(id);
     if (source === "sam") return await samNotice(id, env.SAM_GOV_API_KEY);
-  } catch { return null; }
+  } catch (error) {
+    console.error("Official notice lookup failed", { source, id, message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  }
   return null;
 }
 

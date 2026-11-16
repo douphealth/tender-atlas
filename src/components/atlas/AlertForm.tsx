@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import type { TenderSearch } from "./SearchForm";
 import { Turnstile, TURNSTILE_SITE_KEY } from "./Turnstile";
 
 export function AlertForm({ query }: { query: TenderSearch }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const subscribe = async (event: React.FormEvent<HTMLFormElement>) => {
+  const subscribe = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setBusy(true); setStatus("");
