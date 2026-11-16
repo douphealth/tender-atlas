@@ -12,3 +12,7 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /app
+
+Sitemap: https://tender-atlas.pages.dev/sitemap.xml

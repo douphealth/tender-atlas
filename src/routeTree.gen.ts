@@ -10,33 +10,232 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as MethodologyDothtmlRouteImport } from './routes/methodology[.]html'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PrivacyDothtmlRouteImport } from './routes/privacy[.]html'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as CountriesIndexRouteImport } from './routes/countries.index'
+import { Route as CpvIndexRouteImport } from './routes/cpv.index'
+import { Route as CpvCodeRouteImport } from './routes/cpv.$code'
+import { Route as TendersIndexRouteImport } from './routes/tenders.index'
+import { Route as CountriesCodeTendersRouteImport } from './routes/countries.$code.tenders'
+import { Route as TendersSourceIdRouteImport } from './routes/tenders.$source.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodologyRoute = MethodologyRouteImport.update({
+  id: '/methodology',
+  path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodologyDothtmlRoute = MethodologyDothtmlRouteImport.update({
+  id: '/methodology.html',
+  path: '/methodology.html',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyDothtmlRoute = PrivacyDothtmlRouteImport.update({
+  id: '/privacy.html',
+  path: '/privacy.html',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesIndexRoute = CountriesIndexRouteImport.update({
+  id: '/countries/',
+  path: '/countries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CpvIndexRoute = CpvIndexRouteImport.update({
+  id: '/cpv/',
+  path: '/cpv/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CpvCodeRoute = CpvCodeRouteImport.update({
+  id: '/cpv/$code',
+  path: '/cpv/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersIndexRoute = TendersIndexRouteImport.update({
+  id: '/tenders/',
+  path: '/tenders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesCodeTendersRoute = CountriesCodeTendersRouteImport.update({
+  id: '/countries/$code/tenders',
+  path: '/countries/$code/tenders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TendersSourceIdRoute = TendersSourceIdRouteImport.update({
+  id: '/tenders/$source/$id',
+  path: '/tenders/$source/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/methodology': typeof MethodologyRoute
+  '/methodology.html': typeof MethodologyDothtmlRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/privacy.html': typeof PrivacyDothtmlRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/search': typeof ApiSearchRoute
+  '/cpv/$code': typeof CpvCodeRoute
+  '/countries/': typeof CountriesIndexRoute
+  '/cpv/': typeof CpvIndexRoute
+  '/tenders/': typeof TendersIndexRoute
+  '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/tenders/$source/$id': typeof TendersSourceIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/methodology': typeof MethodologyRoute
+  '/methodology.html': typeof MethodologyDothtmlRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/privacy.html': typeof PrivacyDothtmlRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/search': typeof ApiSearchRoute
+  '/cpv/$code': typeof CpvCodeRoute
+  '/countries': typeof CountriesIndexRoute
+  '/cpv': typeof CpvIndexRoute
+  '/tenders': typeof TendersIndexRoute
+  '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/tenders/$source/$id': typeof TendersSourceIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
+  '/methodology': typeof MethodologyRoute
+  '/methodology.html': typeof MethodologyDothtmlRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
+  '/privacy.html': typeof PrivacyDothtmlRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/search': typeof ApiSearchRoute
+  '/cpv/$code': typeof CpvCodeRoute
+  '/countries/': typeof CountriesIndexRoute
+  '/cpv/': typeof CpvIndexRoute
+  '/tenders/': typeof TendersIndexRoute
+  '/countries/$code/tenders': typeof CountriesCodeTendersRoute
+  '/tenders/$source/$id': typeof TendersSourceIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/methodology'
+    | '/methodology.html'
+    | '/pricing'
+    | '/privacy'
+    | '/privacy.html'
+    | '/sitemap.xml'
+    | '/api/health'
+    | '/api/search'
+    | '/cpv/$code'
+    | '/countries/'
+    | '/cpv/'
+    | '/tenders/'
+    | '/countries/$code/tenders'
+    | '/tenders/$source/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/app'
+    | '/methodology'
+    | '/methodology.html'
+    | '/pricing'
+    | '/privacy'
+    | '/privacy.html'
+    | '/sitemap.xml'
+    | '/api/health'
+    | '/api/search'
+    | '/cpv/$code'
+    | '/countries'
+    | '/cpv'
+    | '/tenders'
+    | '/countries/$code/tenders'
+    | '/tenders/$source/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/methodology'
+    | '/methodology.html'
+    | '/pricing'
+    | '/privacy'
+    | '/privacy.html'
+    | '/sitemap.xml'
+    | '/api/health'
+    | '/api/search'
+    | '/cpv/$code'
+    | '/countries/'
+    | '/cpv/'
+    | '/tenders/'
+    | '/countries/$code/tenders'
+    | '/tenders/$source/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
+  MethodologyRoute: typeof MethodologyRoute
+  MethodologyDothtmlRoute: typeof MethodologyDothtmlRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
+  PrivacyDothtmlRoute: typeof PrivacyDothtmlRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiSearchRoute: typeof ApiSearchRoute
+  CpvCodeRoute: typeof CpvCodeRoute
+  CountriesIndexRoute: typeof CountriesIndexRoute
+  CpvIndexRoute: typeof CpvIndexRoute
+  TendersIndexRoute: typeof TendersIndexRoute
+  CountriesCodeTendersRoute: typeof CountriesCodeTendersRoute
+  TendersSourceIdRoute: typeof TendersSourceIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +247,131 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/methodology': {
+      id: '/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/methodology.html': {
+      id: '/methodology.html'
+      path: '/methodology.html'
+      fullPath: '/methodology.html'
+      preLoaderRoute: typeof MethodologyDothtmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy.html': {
+      id: '/privacy.html'
+      path: '/privacy.html'
+      fullPath: '/privacy.html'
+      preLoaderRoute: typeof PrivacyDothtmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/': {
+      id: '/countries/'
+      path: '/countries'
+      fullPath: '/countries/'
+      preLoaderRoute: typeof CountriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cpv/': {
+      id: '/cpv/'
+      path: '/cpv'
+      fullPath: '/cpv/'
+      preLoaderRoute: typeof CpvIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cpv/$code': {
+      id: '/cpv/$code'
+      path: '/cpv/$code'
+      fullPath: '/cpv/$code'
+      preLoaderRoute: typeof CpvCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/': {
+      id: '/tenders/'
+      path: '/tenders'
+      fullPath: '/tenders/'
+      preLoaderRoute: typeof TendersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/$code/tenders': {
+      id: '/countries/$code/tenders'
+      path: '/countries/$code/tenders'
+      fullPath: '/countries/$code/tenders'
+      preLoaderRoute: typeof CountriesCodeTendersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenders/$source/$id': {
+      id: '/tenders/$source/$id'
+      path: '/tenders/$source/$id'
+      fullPath: '/tenders/$source/$id'
+      preLoaderRoute: typeof TendersSourceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
+  MethodologyRoute: MethodologyRoute,
+  MethodologyDothtmlRoute: MethodologyDothtmlRoute,
+  PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
+  PrivacyDothtmlRoute: PrivacyDothtmlRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ApiSearchRoute: ApiSearchRoute,
+  CpvCodeRoute: CpvCodeRoute,
+  CountriesIndexRoute: CountriesIndexRoute,
+  CpvIndexRoute: CpvIndexRoute,
+  TendersIndexRoute: TendersIndexRoute,
+  CountriesCodeTendersRoute: CountriesCodeTendersRoute,
+  TendersSourceIdRoute: TendersSourceIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
