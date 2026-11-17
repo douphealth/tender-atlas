@@ -4,7 +4,7 @@ import { SOURCES, countryByIso3, cpvDivisionFor } from "@/lib/procurement/catalo
 import { isIndexable, makeIcs, unknowns } from "@/lib/procurement/sources";
 import { StatusPill } from "@/components/atlas/TenderList";
 import { fmtDate, fmtMoney } from "@/components/atlas/format";
-import { pageHead } from "@/lib/seo";
+import { breadcrumbList, jsonLd, pageHead } from "@/lib/seo";
 import { abs } from "@/lib/site";
 import { useWorkspace } from "@/lib/workspace";
 import { buyerSlug } from "@/lib/procurement/reconcile";
@@ -17,27 +17,28 @@ export const Route = createFileRoute("/tenders/$source/$id")({
     return n;
   },
   head: ({ loaderData: n, params }) => {
-    if (!n) return pageHead({ title: "Tender not found", description: "This notice could not be found at its official source.", path: `/tenders/${params.source}/${params.id}`, noindex: true });
+    if (!n) return pageHead({ title: "Tender not found", description: "This notice could not be found at its official source.", path: `/tenders/${params.source}/${params.id}`, noindex: true, canonical: false });
     const where = countryByIso3(n.country)?.name ?? n.countryName;
+    const path = `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}`;
     return pageHead({
-      title: n.title.slice(0, 70),
-      description: `${n.buyer ?? "Public buyer"}${where ? `, ${where}` : ""}. ${n.deadlineAt ? `Deadline ${n.deadlineAt}. ` : ""}Official ${SOURCES[n.source].label} notice ${n.noticeId}.`.slice(0, 160),
-      path: `/tenders/${n.source}/${n.noticeId}`,
+      title: n.title,
+      description: `${n.buyer ?? "Public buyer"}${where ? `, ${where}` : ""}. ${n.deadlineAt ? `Deadline ${n.deadlineAt}. ` : ""}Official ${SOURCES[n.source].label} notice ${n.noticeId}.`,
+      path,
       image: abs(`/og/tenders/${n.source}/${encodeURIComponent(n.noticeId)}.png`),
       noindex: !isIndexable(n),
-      jsonLd: { "@context": "https://schema.org", "@graph": [
-        { "@type": "Demand", name: n.title, description: n.description ?? undefined, url: abs(`/tenders/${n.source}/${n.noticeId}`),
+      jsonLd: jsonLd([
+        { "@type": "Demand", name: n.title, description: n.description ?? undefined, url: abs(path),
           datePosted: n.publishedAt ?? undefined, validThrough: n.deadlineAt ?? undefined,
           seller: n.buyer ? { "@type": "GovernmentOrganization", name: n.buyer, url: abs(`/buyers/${buyerSlug(n.buyer)}`) } : undefined,
           itemOffered: { "@type": "Service", name: n.title, category: n.cpv.map((c) => `CPV ${c}`) },
           eligibleRegion: where ? { "@type": "Country", name: where } : undefined,
           priceSpecification: n.value != null && n.currency ? { "@type": "PriceSpecification", price: n.value, priceCurrency: n.currency } : undefined,
         },
-        { "@type": "BreadcrumbList", itemListElement: [
-          { "@type": "ListItem", position: 1, name: "Tenders", item: abs("/tenders") },
-          { "@type": "ListItem", position: 2, name: n.title.slice(0, 80), item: abs(`/tenders/${n.source}/${n.noticeId}`) },
-        ] },
-      ] },
+        breadcrumbList([
+          { name: "Tenders", path: "/tenders" },
+          { name: n.title, path },
+        ]),
+      ]),
     });
   },
   notFoundComponent: () => (
@@ -73,7 +74,9 @@ function TenderPage() {
       </nav>
       <div className="mt-4 flex flex-wrap items-center gap-3"><StatusPill n={n} /><span className="font-mono text-xs text-muted-foreground">{n.noticeId}</span></div>
       <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-tight sm:text-4xl">{n.title}</h1>
-      <p className="mt-2 text-lg text-muted-foreground">{n.buyer ? <Link to="/buyers/$slug" params={{ slug: buyerSlug(n.buyer) }} className="hover:text-accent hover:underline">{n.buyer}</Link> : "Contracting authority not disclosed"}</p>
+      <p className="mt-4 max-w-3xl text-lg text-muted-foreground">
+        Official {SOURCES[n.source].name} notice {n.noticeId}{country ? ` in ${country.name}` : n.countryName ? ` in ${n.countryName}` : ""}. Buyer: {n.buyer ? <Link to="/buyers/$slug" params={{ slug: buyerSlug(n.buyer) }} className="hover:text-accent hover:underline">{n.buyer}</Link> : "not disclosed"}. {n.deadlineAt ? <>Deadline: {fmtDate(n.deadlineAt)}.</> : "Deadline: not disclosed."} Confirm the record on the official notice before bidding.
+      </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {n.url && <a href={n.url} target="_blank" rel="noopener noreferrer" className="rounded-sm bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">Open official notice ↗</a>}

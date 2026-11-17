@@ -19,7 +19,7 @@ crons = ["17 */6 * * *", "7 6 * * *"]
 # Set secrets with: wrangler secret put SAM_GOV_API_KEY
 # Optional: TURNSTILE_SECRET_KEY, RESEND_API_KEY, STRIPE_SECRET_KEY,
 # STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID, CRON_SECRET
-# Public build variables: VITE_SITE_URL, VITE_TURNSTILE_SITE_KEY
+# Public build variables: VITE_SITE_URL (optional; default https://tenderatlas.shop; *.pages.dev is ignored), VITE_TURNSTILE_SITE_KEY
 # Plain vars: NOTIFICATION_FROM_EMAIL, NOTIFICATION_TO_EMAIL
 # Paid dossier activation: DOSSIER_SALES_OPEN=true only after confirming delivery capacity;
 # apply 0002_dossier_orders.sql and configure the €290 one-time Stripe price and Stripe Tax.

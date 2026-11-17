@@ -10,8 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SplatRouteImport } from './routes/$'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as MethodologyDothtmlRouteImport } from './routes/methodology[.]html'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -44,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -52,6 +59,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MethodologyRoute = MethodologyRouteImport.update({
@@ -188,8 +200,10 @@ const CountriesCodeCpvCpvRoute = CountriesCodeCpvCpvRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -219,8 +233,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -251,8 +267,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -284,8 +302,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -315,8 +335,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -346,8 +368,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/$'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -378,8 +402,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SplatRoute: typeof SplatRoute
   AlertsRoute: typeof AlertsRouteWithChildren
   AppRoute: typeof AppRoute
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   MethodologyRoute: typeof MethodologyRoute
   MethodologyDothtmlRoute: typeof MethodologyDothtmlRoute
   PricingRoute: typeof PricingRoute
@@ -415,6 +441,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/alerts': {
       id: '/alerts'
       path: '/alerts'
@@ -427,6 +460,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/methodology': {
@@ -629,8 +669,10 @@ const AlertsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SplatRoute: SplatRoute,
   AlertsRoute: AlertsRouteWithChildren,
   AppRoute: AppRoute,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   MethodologyRoute: MethodologyRoute,
   MethodologyDothtmlRoute: MethodologyDothtmlRoute,
   PricingRoute: PricingRoute,

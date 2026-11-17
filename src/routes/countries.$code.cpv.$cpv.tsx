@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { searchTenders } from "@/lib/procurement/api";
 import { countryBySlug, cpvDivision, SOURCES } from "@/lib/procurement/catalog";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
-import { pageHead } from "@/lib/seo";
+import { breadcrumbList, itemList, jsonLd, pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/countries/$code/cpv/$cpv")({
   loader: async ({ params }) => {
@@ -18,7 +18,15 @@ export const Route = createFileRoute("/countries/$code/cpv/$cpv")({
     description: `${loaderData.division.name} public tenders in ${loaderData.country.name}: CPV ${loaderData.division.code}, official notices, buyers and deadlines.`,
     path: `/countries/${loaderData.country.iso2}/cpv/${loaderData.division.code}`,
     noindex: loaderData.result.items.length < 5,
-  }) : pageHead({ title: "Tender category not found", description: "This country and CPV combination is not covered.", path: `/countries/${params.code}/cpv/${params.cpv}`, noindex: true }),
+    jsonLd: jsonLd([
+      breadcrumbList([
+        { name: loaderData.country.name, path: `/countries/${loaderData.country.iso2}/tenders` },
+        { name: `CPV ${loaderData.division.code.slice(0, 2)}`, path: `/cpv/${loaderData.division.code}` },
+        { name: `${loaderData.division.name} in ${loaderData.country.name}`, path: `/countries/${loaderData.country.iso2}/cpv/${loaderData.division.code}` },
+      ]),
+      ...(loaderData.result.items.length ? [itemList(`${loaderData.division.name} tenders in ${loaderData.country.name}`, loaderData.result.items.map((n) => ({ name: n.title, path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}` })))] : []),
+    ]),
+  }) : pageHead({ title: "Tender category not found", description: "This country and CPV combination is not covered.", path: `/countries/${params.code}/cpv/${params.cpv}`, noindex: true, canonical: false }),
   component: CountryCpvPage,
 });
 

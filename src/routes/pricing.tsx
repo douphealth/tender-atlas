@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { jsonLd, pageHead } from "@/lib/seo";
 import { DossierForm } from "@/components/atlas/DossierForm";
 import { SampleDossier } from "@/components/atlas/SampleDossier";
 import { DossierConfirmation } from "@/components/atlas/DossierConfirmation";
@@ -15,7 +15,26 @@ export const Route = createFileRoute("/pricing")({
     ...(typeof search["order"] === "string" && z.string().uuid().safeParse(search["order"]).success ? { order: search["order"] } : {}),
     ...(search["payment"] === "returned" || search["payment"] === "cancelled" ? { payment: search["payment"] } : {}),
   }),
-  head: () => pageHead({ title: "Tender Readiness Dossiers", description: "Document-backed bid/no-bid dossiers: mandatory requirements, risks and open questions, each cited to the page of the official tender documents.", path: "/pricing" }),
+  head: ({ match }) => {
+    const search = match.search;
+    const utility = Boolean(search.order || search.payment || search.source || search.notice);
+    const description = "Document-backed bid/no-bid dossiers: requirements, risks and open questions, each cited to the official tender documents.";
+    return pageHead({
+      title: "Tender Readiness Dossiers",
+      description,
+      path: "/pricing",
+      noindex: utility,
+      jsonLd: utility ? undefined : jsonLd([{
+        "@type": "Service",
+        name: "Tender Readiness Dossier",
+        serviceType: "Document-backed bid/no-bid review",
+        description: DOSSIER_OFFER.scope,
+        url: abs("/pricing"),
+        provider: { "@type": "Organization", name: "TenderAtlas", url: abs("/") },
+        offers: { "@type": "Offer", price: "290", priceCurrency: "EUR", url: abs("/pricing"), description: "One-off, plus applicable tax. No subscription." },
+      }]),
+    });
+  },
   component: Pricing,
 });
 

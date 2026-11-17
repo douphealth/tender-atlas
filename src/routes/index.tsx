@@ -3,17 +3,25 @@ import { searchTenders } from "@/lib/procurement/api";
 import { COUNTRIES, CPV_DIVISIONS, SOURCES, SOURCE_KEYS } from "@/lib/procurement/catalog";
 import { TenderList, SourceHealth } from "@/components/atlas/TenderList";
 import { SearchForm } from "@/components/atlas/SearchForm";
-import { pageHead } from "@/lib/seo";
-import { abs } from "@/lib/site";
+import { itemList, jsonLd, pageHead } from "@/lib/seo";
+import { abs, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const Route = createFileRoute("/")({
   loader: () => searchTenders({ data: { days: 7, only: ["ted", "fr", "wb"] } }),
-  head: () => pageHead({
-    title: "TenderAtlas — Live public tenders from official procurement sources",
-    description: "Find open public tenders across Europe, the UK, France, Greece, the US and World Bank projects. Every notice links to its official publisher.",
-    path: "/",
-    jsonLd: { "@context": "https://schema.org", "@type": "WebSite", name: "TenderAtlas", url: abs("/"), potentialAction: { "@type": "SearchAction", target: abs("/tenders?q={q}"), "query-input": "required name=q" } },
-  }),
+  head: ({ loaderData }) => {
+    const open = (loaderData?.items ?? []).filter((n) => n.status === "open").slice(0, 12);
+    const description = "Find open public tenders across Europe, the UK, France, Greece, the US and World Bank projects. Every notice links to its official publisher.";
+    return pageHead({
+      title: "TenderAtlas — official public tenders",
+      description,
+      path: "/",
+      jsonLd: jsonLd([
+        { "@type": "Organization", name: SITE_NAME, url: abs("/"), logo: abs("/favicon.svg"), description },
+        { "@type": "WebSite", name: SITE_NAME, url: abs("/"), publisher: { "@type": "Organization", name: SITE_NAME, url: abs("/") }, potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/tenders?q={search_term_string}` }, "query-input": "required name=search_term_string" } },
+        ...(open.length ? [itemList("Open public tenders published in the last 7 days", open.map((n) => ({ name: n.title, path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}` })))] : []),
+      ]),
+    });
+  },
   component: Home,
 });
 

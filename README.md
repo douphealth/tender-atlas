@@ -36,7 +36,7 @@ No Lovable service, account, database or AI gateway is used.
    bunx wrangler d1 migrations apply tender-atlas --remote
    ```
 
-4. Set `VITE_SITE_URL` to the public HTTPS origin and deploy the TanStack Start Cloudflare build using the owner's normal Worker deployment.
+4. The canonical origin defaults to `https://tenderatlas.shop`. Set `VITE_SITE_URL` only to override it. A `pages.dev` value is ignored so preview hosts cannot leak into canonicals, the sitemap or JSON-LD. Deploy the TanStack Start Cloudflare build using the owner's normal Worker deployment.
 5. Trigger `POST /api/public/ingest` with `Authorization: Bearer $CRON_SECRET` once, or wait for the scheduled ingestion. Stored search activates automatically when fresh records exist; until then the live adapters remain available.
 
 The two cron expressions in the example run ingestion every six hours and confirmed alert digests daily.
@@ -61,7 +61,7 @@ Public/plain settings:
 - `NOTIFICATION_FROM_EMAIL`: verified Resend sender
 - `NOTIFICATION_TO_EMAIL`: optional dossier-request recipient
 - `DOSSIER_SALES_OPEN=true`: explicitly open tender-specific paid bookings after confirming delivery capacity (default: closed)
-- `VITE_SITE_URL`: canonical, sitemap, feed and email-link origin
+- `VITE_SITE_URL`: optional override for the canonical, sitemap, feed and email-link origin. Default: `https://tenderatlas.shop`. `*.pages.dev` is rejected.
 
 Configure the Stripe webhook for `POST /api/public/stripe/webhook`, `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Apply all migrations, including `0002_dossier_orders.sql`. Dossier requests and alerts return an honest unavailable response until their required owner settings exist.
 
@@ -83,3 +83,7 @@ Configure the Stripe webhook for `POST /api/public/stripe/webhook`, `checkout.se
 - Cross-source records merge only on exact normalised buyer, title, country and deadline; related official records stay linked.
 - Sitemap `lastmod` values come only from each notice's publisher update/publication date.
 - Faceted search pages remain noindex; country/category/hub pages require at least five results for indexing.
+
+## IndexNow
+
+The public IndexNow key file is `/6541e36054ab20cf0850f67f4db053df.txt` (the file body is the key). After deployment, the owner can ping Bing or Yandex with key location `https://tenderatlas.shop/6541e36054ab20cf0850f67f4db053df.txt`.

@@ -3,7 +3,7 @@ import { searchTenders } from "@/lib/procurement/api";
 import { countryBySlug, CPV_DIVISIONS, SOURCES } from "@/lib/procurement/catalog";
 import { buyerSlug } from "@/lib/procurement/reconcile";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
-import { pageHead } from "@/lib/seo";
+import { breadcrumbList, itemList, jsonLd, pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/countries/$code/tenders")({
   loader: async ({ params }) => {
@@ -18,8 +18,12 @@ export const Route = createFileRoute("/countries/$code/tenders")({
         description: `Open public procurement notices in ${loaderData.country.name} published in the last 30 days, from ${loaderData.country.sources.map((s) => SOURCES[s].label).join(", ")}.`,
         path: `/countries/${loaderData.country.iso2}/tenders`,
         noindex: loaderData.result.items.length < 5,
+        jsonLd: jsonLd([
+          breadcrumbList([{ name: "Countries", path: "/countries" }, { name: loaderData.country.name, path: `/countries/${loaderData.country.iso2}/tenders` }]),
+          ...(loaderData.result.items.length ? [itemList(`Public tenders in ${loaderData.country.name}`, loaderData.result.items.map((n) => ({ name: n.title, path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}` })))] : []),
+        ]),
       })
-    : pageHead({ title: "Country not covered", description: "This country has no TenderAtlas directory page.", path: `/countries/${params.code}/tenders`, noindex: true }),
+    : pageHead({ title: "Country not covered", description: "This country has no TenderAtlas directory page.", path: `/countries/${params.code}/tenders`, noindex: true, canonical: false }),
   component: CountryPage,
 });
 
