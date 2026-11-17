@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as MethodologyDothtmlRouteImport } from './routes/methodology[.]html'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -52,6 +53,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MethodologyRoute = MethodologyRouteImport.update({
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/app': typeof AppRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/methodology': typeof MethodologyRoute
   '/methodology.html': typeof MethodologyDothtmlRoute
   '/pricing': typeof PricingRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -348,6 +359,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/app'
+    | '/llms.txt'
     | '/methodology'
     | '/methodology.html'
     | '/pricing'
@@ -380,6 +392,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRouteWithChildren
   AppRoute: typeof AppRoute
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   MethodologyRoute: typeof MethodologyRoute
   MethodologyDothtmlRoute: typeof MethodologyDothtmlRoute
   PricingRoute: typeof PricingRoute
@@ -427,6 +440,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/methodology': {
@@ -631,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRouteWithChildren,
   AppRoute: AppRoute,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   MethodologyRoute: MethodologyRoute,
   MethodologyDothtmlRoute: MethodologyDothtmlRoute,
   PricingRoute: PricingRoute,

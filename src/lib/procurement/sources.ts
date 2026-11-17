@@ -195,7 +195,7 @@ async function remoteJSON(url: string, opt: RequestInit = {}): Promise<any> {
   const c = new AbortController();
   const timer = setTimeout(() => c.abort(), TIMEOUT);
   try {
-    const r = await fetch(url, { ...opt, signal: c.signal, headers: { Accept: "application/json", "User-Agent": "TenderAtlas/1.0 (+https://tender-atlas.pages.dev/methodology)", ...(opt.headers || {}) } });
+    const r = await fetch(url, { ...opt, signal: c.signal, headers: { Accept: "application/json", "User-Agent": "TenderAtlas/1.0 (+https://tenderatlas.shop/methodology)", ...(opt.headers || {}) } });
     if (!r.ok) throw new Error(r.status === 429 ? "Rate limited by publisher" : `Publisher HTTP ${r.status}`);
     if (!/json/i.test(r.headers.get("content-type") || "")) throw new Error("Publisher returned non-JSON");
     return await r.json();
