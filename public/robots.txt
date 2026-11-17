@@ -1,18 +1,29 @@
+# Search and answer-engine crawlers are allowed, including Googlebot, Bingbot,
+# GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, ClaudeBot, Google-Extended
+# and Applebot-Extended. One group so those bots keep the same disallows as everyone else.
+
 User-agent: Googlebot
-Allow: /
-
 User-agent: Bingbot
-Allow: /
-
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
 User-agent: Twitterbot
-Allow: /
-
 User-agent: facebookexternalhit
 Allow: /
+Disallow: /api/
+Disallow: /app
+Disallow: /alerts/verify
+Disallow: /alerts/unsubscribe
 
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /app
+Disallow: /alerts/verify
+Disallow: /alerts/unsubscribe
 
-Sitemap: https://tender-atlas.pages.dev/sitemap.xml
+Sitemap: https://tenderatlas.shop/sitemap.xml

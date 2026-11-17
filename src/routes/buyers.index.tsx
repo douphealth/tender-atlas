@@ -1,10 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getBuyers } from "@/lib/directory";
-import { pageHead } from "@/lib/seo";
+import { itemList, jsonLd, pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/buyers/")({
   loader: () => getBuyers(),
-  head: () => pageHead({ title: "Public buyers and contracting authorities", description: "Explore public-sector buyers, their active opportunities, procurement categories and official notices.", path: "/buyers" }),
+  head: ({ loaderData }) => pageHead({
+    title: "Public buyers and contracting authorities",
+    description: "Explore public-sector buyers, their active opportunities, procurement categories and official notices.",
+    path: "/buyers",
+    jsonLd: loaderData?.items.length ? jsonLd([itemList("Public buyers", loaderData.items.map((buyer) => ({ name: buyer.name, path: `/buyers/${buyer.slug}` })))]) : undefined,
+  }),
   component: BuyersPage,
 });
 

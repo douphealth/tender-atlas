@@ -3,7 +3,7 @@ import { getBuyer } from "@/lib/directory";
 import { TenderList } from "@/components/atlas/TenderList";
 import { cpvDivision } from "@/lib/procurement/catalog";
 import { fmtMoney } from "@/components/atlas/format";
-import { pageHead } from "@/lib/seo";
+import { breadcrumbList, jsonLd, pageHead } from "@/lib/seo";
 import { abs } from "@/lib/site";
 
 export const Route = createFileRoute("/buyers/$slug")({
@@ -13,12 +13,15 @@ export const Route = createFileRoute("/buyers/$slug")({
     return result;
   },
   head: ({ loaderData, params }) => loaderData?.profile ? pageHead({
-    title: `${loaderData.profile.name} tenders and procurement history`,
-    description: `${loaderData.profile.open} open opportunities and ${loaderData.profile.count} official notices from ${loaderData.profile.name}. Explore categories, deadlines and source records.`,
+    title: `${loaderData.profile.name} public tenders`,
+    description: `${loaderData.profile.open} open opportunities and ${loaderData.profile.count} official notices from ${loaderData.profile.name}. Categories, deadlines and source records from the current coverage.`,
     path: `/buyers/${loaderData.profile.slug}`,
     noindex: loaderData.profile.count < 2,
-    jsonLd: { "@context": "https://schema.org", "@type": "GovernmentOrganization", name: loaderData.profile.name, url: abs(`/buyers/${loaderData.profile.slug}`) },
-  }) : pageHead({ title: "Buyer not found", description: "This buyer is not present in the current official-notice coverage.", path: `/buyers/${params.slug}`, noindex: true }),
+    jsonLd: jsonLd([
+      { "@type": "GovernmentOrganization", name: loaderData.profile.name, url: abs(`/buyers/${loaderData.profile.slug}`) },
+      breadcrumbList([{ name: "Buyers", path: "/buyers" }, { name: loaderData.profile.name, path: `/buyers/${loaderData.profile.slug}` }]),
+    ]),
+  }) : pageHead({ title: "Buyer not found", description: "This buyer is not present in the current official-notice coverage.", path: `/buyers/${params.slug}`, noindex: true, canonical: false }),
   component: BuyerPage,
   notFoundComponent: () => <div className="mx-auto max-w-2xl px-4 py-24 text-center"><h1 className="text-3xl font-semibold">Buyer not found</h1><p className="mt-3 text-muted-foreground">This buyer is outside the current archive or live coverage.</p><Link to="/buyers" className="mt-5 inline-block text-accent underline">Browse buyers</Link></div>,
 });

@@ -18,8 +18,8 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <p className="font-mono text-sm text-muted-foreground">404</p>
+        <h1 className="mt-4 text-3xl font-semibold text-foreground">Page not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
@@ -85,8 +85,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "TenderAtlas — Public tenders from official sources" },
       { name: "description", content: "Search live public procurement notices from TED, BOAMP, KIMDIS, Find a Tender, World Bank and SAM.gov." },
       { property: "og:site_name", content: "TenderAtlas" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
       { name: "theme-color", content: "#1c2a44" },
     ],
     links: [

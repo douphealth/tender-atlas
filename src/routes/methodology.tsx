@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SOURCES, SOURCE_KEYS } from "@/lib/procurement/catalog";
-import { pageHead } from "@/lib/seo";
+import { jsonLd, pageHead } from "@/lib/seo";
+import { abs } from "@/lib/site";
 
 export const Route = createFileRoute("/methodology")({
-  head: () => pageHead({ title: "Methodology & data sources", description: "How TenderAtlas reads official procurement APIs, what each source covers, and what we never infer.", path: "/methodology" }),
+  head: () => pageHead({
+    title: "Methodology and data sources",
+    description: "How TenderAtlas reads official procurement APIs, what each source covers, and what we never infer.",
+    path: "/methodology",
+    jsonLd: jsonLd([{ "@type": "WebPage", name: "How TenderAtlas reads tenders", url: abs("/methodology"), description: "How TenderAtlas reads official procurement APIs, what each source covers, and what we never infer." }]),
+  }),
   component: () => (
     <article className="mx-auto max-w-3xl px-4 py-10 leading-relaxed">
       <p className="eyebrow">Methodology</p>

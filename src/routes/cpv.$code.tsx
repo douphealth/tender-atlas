@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { searchTenders } from "@/lib/procurement/api";
 import { COUNTRIES, cpvDivision } from "@/lib/procurement/catalog";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
-import { pageHead } from "@/lib/seo";
+import { breadcrumbList, itemList, jsonLd, pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/cpv/$code")({
   loader: async ({ params }) => {
@@ -17,8 +17,12 @@ export const Route = createFileRoute("/cpv/$code")({
         description: `Public tenders classified under CPV ${loaderData.division.code} — ${loaderData.division.name} — published in the last 30 days across Europe.`,
         path: `/cpv/${loaderData.division.code}`,
         noindex: loaderData.result.items.length < 5,
+        jsonLd: jsonLd([
+          breadcrumbList([{ name: "Categories", path: "/cpv" }, { name: `CPV ${loaderData.division.code}`, path: `/cpv/${loaderData.division.code}` }]),
+          ...(loaderData.result.items.length ? [itemList(loaderData.division.name, loaderData.result.items.map((n) => ({ name: n.title, path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}` })))] : []),
+        ]),
       })
-    : pageHead({ title: "Unknown CPV division", description: "Not a CPV division.", path: `/cpv/${params.code}`, noindex: true }),
+    : pageHead({ title: "Unknown CPV division", description: "This is not a CPV division TenderAtlas publishes.", path: `/cpv/${params.code}`, noindex: true, canonical: false }),
   component: CpvPage,
 });
 

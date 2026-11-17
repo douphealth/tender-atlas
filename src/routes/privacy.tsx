@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { jsonLd, pageHead } from "@/lib/seo";
+import { abs } from "@/lib/site";
 
 export const Route = createFileRoute("/privacy")({
-  head: () => pageHead({ title: "Privacy", description: "TenderAtlas has no accounts and stores your saved tenders only in your own browser.", path: "/privacy" }),
+  head: () => pageHead({
+    title: "Privacy",
+    description: "TenderAtlas has no accounts. Saved tenders stay in your browser. Dossier and alert details are stored only to fulfil that request.",
+    path: "/privacy",
+    jsonLd: jsonLd([{ "@type": "WebPage", name: "Privacy", url: abs("/privacy"), description: "TenderAtlas has no accounts. Saved tenders stay in your browser. Dossier and alert details are stored only to fulfil that request." }]),
+  }),
   component: () => (
     <article className="mx-auto max-w-3xl px-4 py-10 leading-relaxed">
       <h1 className="text-4xl font-semibold">Privacy</h1>
+      <p className="mt-4 text-lg text-muted-foreground">TenderAtlas has no user accounts. Saved tenders stay in this browser. A dossier request or email alert is stored only to fulfil that request.</p>
       <ul className="mt-6 list-disc space-y-2 pl-5">
         <li>There are no user accounts. Saved tenders, notes and saved searches are stored in your browser's local storage on this device only. Clearing site data deletes them.</li>
         <li>Your search terms are forwarded to the official publishers listed in the methodology to retrieve results.</li>

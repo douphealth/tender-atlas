@@ -3,7 +3,7 @@ import { searchTenders } from "@/lib/procurement/api";
 import { SearchForm, type TenderSearch } from "@/components/atlas/SearchForm";
 import { SourceHealth, TenderList } from "@/components/atlas/TenderList";
 import { AlertForm } from "@/components/atlas/AlertForm";
-import { pageHead } from "@/lib/seo";
+import { itemList, jsonLd, pageHead } from "@/lib/seo";
 import { useWorkspace } from "@/lib/workspace";
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : undefined);
@@ -18,13 +18,15 @@ export const Route = createFileRoute("/tenders/")({
   }),
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) => searchTenders({ data: { ...deps } }),
-  head: ({ match }) => {
+  head: ({ match, loaderData }) => {
     const filtered = Object.values(match.search ?? {}).some((v) => v !== undefined);
+    const items = loaderData?.items ?? [];
     return pageHead({
       title: "Search public tenders",
-      description: "Search open public procurement notices across TED, BOAMP, KIMDIS, Find a Tender, World Bank and SAM.gov by keyword, buyer, country, CPV, deadline and value.",
+      description: "Search open public procurement notices across TED, BOAMP, KIMDIS, Find a Tender, World Bank and SAM.gov by keyword, country, CPV, deadline and value.",
       path: "/tenders",
       noindex: filtered,
+      jsonLd: filtered || !items.length ? undefined : jsonLd([itemList("Public tenders", items.map((n) => ({ name: n.title, path: `/tenders/${n.source}/${encodeURIComponent(n.noticeId)}` })))]),
     });
   },
   component: TendersPage,
@@ -39,6 +41,7 @@ function TendersPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Official-source intelligence</p><h1 className="mt-1 text-4xl font-semibold">Public tenders</h1></div><a href={`/tenders.rss${feedQuery ? `?${feedQuery}` : ""}`} className="rounded-sm border border-border px-3 py-2 text-sm hover:bg-secondary">RSS feed</a></div>
+      <p className="mt-3 max-w-2xl text-muted-foreground">Search live notices from TED, BOAMP, KIMDIS, Find a Tender, World Bank and SAM.gov. Every result links to the official publisher record.</p>
       <div className="mt-6"><SearchForm key={JSON.stringify(search)} initial={search} /></div>
       <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
         <SourceHealth result={data} />
