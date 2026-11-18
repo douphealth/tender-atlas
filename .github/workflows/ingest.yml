@@ -1,0 +1,18 @@
+# Cloudflare Pages has no cron triggers, so this calls the protected ingestion endpoint every 6 hours.
+# Requires the repo secret TENDER_ATLAS_CRON_SECRET to equal the Pages secret CRON_SECRET.
+name: Ingest tenders
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger incremental ingestion
+        env:
+          CRON_SECRET: ${{ secrets.TENDER_ATLAS_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "TENDER_ATLAS_CRON_SECRET is not set; skipping."; exit 0; fi
+          curl -fsS -X POST "https://tenderatlas.shop/api/public/ingest" -H "Authorization: Bearer $CRON_SECRET" --max-time 300

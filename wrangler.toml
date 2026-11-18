@@ -1,0 +1,13 @@
+# Cloudflare Pages project config (source of truth for bindings once committed).
+# Generated from the live project with `wrangler pages download config tender-atlas`, plus the D1 binding.
+# Secrets are NOT stored here: set them with `bunx wrangler pages secret put NAME --project-name tender-atlas`.
+name = "tender-atlas"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-17"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tender-atlas"
+database_id = "9ffda723-5a30-45e9-8434-9ded260134db"
+migrations_dir = "migrations"
