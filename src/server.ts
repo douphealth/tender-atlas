@@ -60,7 +60,9 @@ export default {
     })().catch((error) => console.error("Scheduled TenderAtlas job failed", error)));
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    setCfEnv(env);
+    // Nitro may pass the Cloudflare env as the 2nd argument or attach it to the request (srvx runtime).
+    const r = request as Request & { runtime?: { cloudflare?: { env?: unknown } }; context?: { cloudflare?: { env?: unknown } } };
+    setCfEnv((env && typeof env === "object" && "DB" in (env as object)) ? env : (r.runtime?.cloudflare?.env ?? r.context?.cloudflare?.env ?? env));
     const redirect = seoPreflight(request);
     if (redirect) return redirect;
     try {
