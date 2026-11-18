@@ -48,7 +48,7 @@ export function DossierOrder({ notice }: { notice: Notice }) {
     <div className="flex items-center justify-between gap-3"><span className="eyebrow">Bid decision · pilot</span><FileCheck2 aria-hidden className="size-5 text-accent" /></div>
     <h2 id="dossier-order-title" className="mt-3 text-2xl font-semibold">Know before you bid.</h2>
     <p className="mt-2 text-sm text-muted-foreground">A page-cited Readiness Dossier for this tender. Evidence first. No invented eligibility.</p>
-    <div className="mt-5 flex items-baseline gap-2"><span className="font-mono text-3xl font-semibold">€290</span><span className="text-xs text-muted-foreground">one-off · plus applicable tax</span></div>
+    <div className="mt-5 flex items-baseline gap-2"><span className="font-mono text-3xl font-semibold">€290</span><span className="text-xs text-muted-foreground">one-off · no subscription</span></div>
     <p className="mt-2 text-xs text-muted-foreground">{DOSSIER_OFFER.scope}. PDF + editable checklist.</p>
     <ul className="mt-5 space-y-2.5 text-sm">{["Page-cited eligibility matrix", "Submission & evidence checklist", "Prioritised risks and clarification questions", "Document versions, amendments & unknowns"].map((item) => <li key={item} className="flex gap-2"><Check aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />{item}</li>)}</ul>
     <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">{DOSSIER_OFFER.delivery}</p>
@@ -64,7 +64,7 @@ export function DossierOrder({ notice }: { notice: Notice }) {
       <Turnstile onToken={setToken} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={busy || !token} className="h-auto min-h-11 w-full whitespace-normal bg-accent text-accent-foreground hover:bg-accent/90">{busy ? <><LoaderCircle className="animate-spin" />Opening checkout…</> : <><LockKeyhole />Continue to Stripe · €290</>}</Button>
-      <p className="text-xs text-muted-foreground">Final tax and total appear on Stripe before you pay. No subscription.</p>
+      <p className="text-xs text-muted-foreground">The final total appears on Stripe before you pay.</p>
     </form>}
     <p className="mt-4 text-xs text-muted-foreground">Full refund if we cannot deliver the agreed scope.</p>
   </section>;

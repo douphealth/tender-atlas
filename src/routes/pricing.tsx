@@ -30,7 +30,7 @@ function Pricing() {
           <p className="eyebrow">Pilot programme</p>
           <h1 className="mt-1 text-4xl font-semibold">Tender Readiness Dossiers</h1>
           <p className="mt-4 text-lg text-muted-foreground">A document-backed bid decision: requirements traced to their page, disqualification risks prioritised, and missing evidence made explicit.</p>
-          <p className="mt-6"><span className="font-mono text-3xl font-semibold">€290</span> <span className="text-sm text-muted-foreground">one-off, plus applicable tax · no subscription</span></p>
+          <p className="mt-6"><span className="font-mono text-3xl font-semibold">€290</span> <span className="text-sm text-muted-foreground">one-off · no subscription</span></p>
           <p className="mt-2 text-sm text-muted-foreground">{DOSSIER_OFFER.scope}.</p>
           <ul className="mt-8 space-y-4">{DOSSIER_OFFER.deliverables.map(([title, detail]) => <li key={title} className="border-l-2 border-accent pl-3"><h2 className="font-sans text-sm font-semibold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{detail}</p></li>)}</ul>
           <p className="mt-8 text-sm text-muted-foreground">{DOSSIER_OFFER.delivery}</p>

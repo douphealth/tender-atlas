@@ -8,7 +8,7 @@ import { isSourceKey } from "../procurement/catalog";
 import { tokenHash, verifyTurnstile } from "../notifications";
 import { abs } from "../site";
 
-export type DossierEnv = AtlasEnv & { DOSSIER_SALES_OPEN?: string | undefined };
+export type DossierEnv = AtlasEnv & { DOSSIER_SALES_OPEN?: string | undefined; STRIPE_AUTOMATIC_TAX?: string | undefined };
 export const orderInput = z.object({
   source: z.string().refine(isSourceKey), noticeId: z.string().min(1).max(160),
   company: z.string().trim().min(2).max(160), email: z.string().trim().email().max(254),
@@ -21,7 +21,7 @@ export function orderableNotice(n: Notice, now = Date.now()): boolean {
   return n.stage === "competition" && n.status === "open" && !!n.url && !!n.deadlineAt && Date.parse(n.deadlineAt) - now > 4 * 86400000;
 }
 export function dossierEnvironment(): DossierEnv {
-  return { DB: cfBinding("DB") as unknown as AtlasEnv["DB"], STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"], STRIPE_PRICE_ID: process.env["STRIPE_PRICE_ID"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DOSSIER_SALES_OPEN: process.env["DOSSIER_SALES_OPEN"], STRIPE_WEBHOOK_SECRET: process.env["STRIPE_WEBHOOK_SECRET"], RESEND_API_KEY: process.env["RESEND_API_KEY"], NOTIFICATION_FROM_EMAIL: process.env["NOTIFICATION_FROM_EMAIL"], NOTIFICATION_TO_EMAIL: process.env["NOTIFICATION_TO_EMAIL"] };
+  return { DB: cfBinding("DB") as unknown as AtlasEnv["DB"], STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"], STRIPE_PRICE_ID: process.env["STRIPE_PRICE_ID"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DOSSIER_SALES_OPEN: process.env["DOSSIER_SALES_OPEN"], STRIPE_AUTOMATIC_TAX: process.env["STRIPE_AUTOMATIC_TAX"], STRIPE_WEBHOOK_SECRET: process.env["STRIPE_WEBHOOK_SECRET"], RESEND_API_KEY: process.env["RESEND_API_KEY"], NOTIFICATION_FROM_EMAIL: process.env["NOTIFICATION_FROM_EMAIL"], NOTIFICATION_TO_EMAIL: process.env["NOTIFICATION_TO_EMAIL"] };
 }
 async function stripe(env: DossierEnv, path: string, options: RequestInit = {}) {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, { ...options, signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...options.headers } });
@@ -33,7 +33,7 @@ export async function availability(env: DossierEnv): Promise<DossierAvailability
   try {
     await env.DB.prepare("SELECT id FROM dossier_orders LIMIT 1").first();
     const price = await stripe(env, `prices/${encodeURIComponent(env.STRIPE_PRICE_ID)}`);
-    if (!validDossierPrice(price, env.STRIPE_PRICE_ID)) return { available: false, reason: "The pilot price is being confirmed. No payment can be taken." };
+    if (!validDossierPrice(price, env.STRIPE_PRICE_ID, env.STRIPE_AUTOMATIC_TAX === "true")) return { available: false, reason: "The pilot price is being confirmed. No payment can be taken." };
     return { available: true, amount: DOSSIER_OFFER.amount, currency: DOSSIER_OFFER.currency };
   } catch { return { available: false, reason: "Secure booking is temporarily unavailable. No payment has been taken." }; }
 }
@@ -64,9 +64,10 @@ export async function createDossierCheckout(request: Request, env: DossierEnv): 
   const body = new URLSearchParams({ mode: "payment", "line_items[0][price]": env.STRIPE_PRICE_ID ?? "", "line_items[0][quantity]": "1", customer_email: data.email,
     client_reference_id: data.orderId, "metadata[requestId]": data.orderId, "metadata[offerVersion]": DOSSIER_OFFER.version,
     success_url: abs(`/pricing?order=${data.orderId}&payment=returned`), cancel_url: abs(`/pricing?order=${data.orderId}&payment=cancelled`),
-    "automatic_tax[enabled]": "true", billing_address_collection: "required", "tax_id_collection[enabled]": "true", expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    billing_address_collection: "required", "tax_id_collection[enabled]": "true", expires_at: String(Math.floor(Date.now() / 1000) + 3600),
     "custom_text[submit][message]": "One tender/one lot, up to 150 pages. Two working days after complete document access. Full refund if we cannot deliver the agreed scope.",
   });
+  if (env.STRIPE_AUTOMATIC_TAX === "true") body.set("automatic_tax[enabled]", "true");
   // Persist exact parameters before the provider call: retries must reuse identical data.
   const payload = existing?.checkout_payload ?? body.toString();
   if (!existing?.checkout_payload) await db.prepare("UPDATE dossier_orders SET checkout_payload = ? WHERE id = ?").bind(payload, data.orderId).run();

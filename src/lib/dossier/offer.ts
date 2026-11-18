@@ -17,6 +17,7 @@ export const DOSSIER_OFFER = {
 
 export type DossierAvailability = { available: boolean; reason?: string; amount?: number; currency?: string };
 
-export function validDossierPrice(price: { id?: string; active?: boolean; type?: string; currency?: string; unit_amount?: number; recurring?: unknown; tax_behavior?: string }, priceId: string): boolean {
-  return price.id === priceId && price.active === true && price.type === "one_time" && !price.recurring && price.currency === DOSSIER_OFFER.currency && price.unit_amount === DOSSIER_OFFER.amount && price.tax_behavior === "exclusive";
+export function validDossierPrice(price: { id?: string; active?: boolean; type?: string; currency?: string; unit_amount?: number; recurring?: unknown; tax_behavior?: string }, priceId: string, automaticTax = true): boolean {
+  // With Stripe Tax on, tax is added on top so the price must exclude tax; without it the flat price is the total.
+  return price.id === priceId && price.active === true && price.type === "one_time" && !price.recurring && price.currency === DOSSIER_OFFER.currency && price.unit_amount === DOSSIER_OFFER.amount && (!automaticTax || price.tax_behavior === "exclusive");
 }

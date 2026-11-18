@@ -27,7 +27,7 @@ function fakeDb(first: (sql: string, values: unknown[]) => unknown = () => null)
   }, async batch(statements) { return Promise.all(statements.map((s) => s.run())); } };
   return { db, writes };
 }
-function environment(db: D1Database): DossierEnv { return { DB: db, DOSSIER_SALES_OPEN: "true", STRIPE_SECRET_KEY: "test-key-not-real", STRIPE_PRICE_ID: "price_test", TURNSTILE_SECRET_KEY: "test-only", STRIPE_WEBHOOK_SECRET: "test-only", RESEND_API_KEY: "test-only", NOTIFICATION_FROM_EMAIL: "seller@example.com", NOTIFICATION_TO_EMAIL: "owner@example.com" }; }
+function environment(db: D1Database): DossierEnv { return { DB: db, DOSSIER_SALES_OPEN: "true", STRIPE_AUTOMATIC_TAX: "true", STRIPE_SECRET_KEY: "test-key-not-real", STRIPE_PRICE_ID: "price_test", TURNSTILE_SECRET_KEY: "test-only", STRIPE_WEBHOOK_SECRET: "test-only", RESEND_API_KEY: "test-only", NOTIFICATION_FROM_EMAIL: "seller@example.com", NOTIFICATION_TO_EMAIL: "owner@example.com" }; }
 function request(body: unknown = data, origin = "https://atlas.example") { return new Request("https://atlas.example/api/public/stripe/checkout", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); vi.mocked(verifyTurnstile).mockResolvedValue(true); });
 
@@ -85,5 +85,14 @@ describe("Verified fulfilment", () => {
   it("does not mark an unpaid completed session paid", async () => {
     vi.stubGlobal("crypto", webcrypto); const { db, writes } = fakeDb(); const raw = JSON.stringify({ id: "evt_unpaid", type: "checkout.session.completed", data: { object: { ...session, payment_status: "unpaid" } } });
     expect((await handleDossierWebhook(new Request("https://atlas.example/webhook", { method: "POST", headers: { "stripe-signature": await signed(raw) }, body: raw }), { DB: db, STRIPE_WEBHOOK_SECRET: "test-secret" })).status).toBe(200); expect(writes).toHaveLength(0);
+  });
+});
+
+describe("flat price without Stripe Tax", () => {
+  it("accepts an unspecified-tax price only when automatic tax is off", async () => {
+    const { validDossierPrice } = await import("./offer");
+    const price = { id: "price_x", active: true, type: "one_time", currency: "eur", unit_amount: 29000, tax_behavior: "unspecified" };
+    expect(validDossierPrice(price, "price_x", false)).toBe(true);
+    expect(validDossierPrice(price, "price_x", true)).toBe(false);
   });
 });
