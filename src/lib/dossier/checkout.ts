@@ -25,7 +25,7 @@ export function dossierEnvironment(): DossierEnv {
 }
 async function stripe(env: DossierEnv, path: string, options: RequestInit = {}) {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, { ...options, signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...options.headers } });
-  if (!response.ok) throw new Error("Payment service unavailable");
+  if (!response.ok) throw Object.assign(new Error("Payment service unavailable"), { status: response.status });
   return response.json();
 }
 export async function availability(env: DossierEnv): Promise<DossierAvailability> {
@@ -68,11 +68,21 @@ export async function createDossierCheckout(request: Request, env: DossierEnv): 
     "custom_text[submit][message]": "One tender/one lot, up to 150 pages. Two working days after complete document access. Full refund if we cannot deliver the agreed scope.",
   });
   if (env.STRIPE_AUTOMATIC_TAX === "true") body.set("automatic_tax[enabled]", "true");
+  // The Stripe account is shared with other products: brand this checkout and the card statement as TenderAtlas.
+  for (const [key, value] of Object.entries(DOSSIER_BRANDING)) body.set(key, value);
   // Persist exact parameters before the provider call: retries must reuse identical data.
   const payload = existing?.checkout_payload ?? body.toString();
   if (!existing?.checkout_payload) await db.prepare("UPDATE dossier_orders SET checkout_payload = ? WHERE id = ?").bind(payload, data.orderId).run();
   try {
-    const session = await stripe(env, "checkout/sessions", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": `dossier-${data.orderId}` }, body: payload });
+    const create = (body: string, key: string) => stripe(env, "checkout/sessions", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": key }, body });
+    let session;
+    try { session = await create(payload, `dossier-${data.orderId}`); }
+    catch (error) {
+      // Branding is cosmetic: if Stripe rejects it (4xx), open a plain checkout rather than lose the sale.
+      const status = (error as { status?: number }).status ?? 0;
+      if (status < 400 || status >= 500 || !Object.keys(DOSSIER_BRANDING).some((k) => payload.includes(encodeURIComponent(k)))) throw error;
+      session = await create(withoutBranding(payload), `dossier-${data.orderId}-plain`);
+    }
     if (!session.id || typeof session.url !== "string" || new URL(session.url).hostname !== "checkout.stripe.com") throw new Error("Invalid checkout");
     await db.prepare("UPDATE dossier_orders SET stripe_session_id = ?, checkout_url = ? WHERE id = ?").bind(session.id, session.url, data.orderId).run();
     return reply({ url: session.url, orderId: data.orderId });
@@ -86,4 +96,13 @@ export async function dossierStatus(request: Request, env: DossierEnv): Promise<
   const row = await env.DB.prepare("SELECT payment_status FROM dossier_orders WHERE id = ? AND access_token_hash = ?").bind(id, await tokenHash(token)).first<{ payment_status: string }>();
   if (!row) return reply({ error: "Order not found." }, 404);
   return reply({ orderId: id, status: row.payment_status });
+}
+export const DOSSIER_BRANDING: Record<string, string> = {
+  "branding_settings[display_name]": "TenderAtlas",
+  "payment_intent_data[statement_descriptor_suffix]": "TENDERATLAS",
+};
+export function withoutBranding(payload: string): string {
+  const params = new URLSearchParams(payload);
+  for (const key of Object.keys(DOSSIER_BRANDING)) params.delete(key);
+  return params.toString();
 }

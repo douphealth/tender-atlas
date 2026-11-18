@@ -57,7 +57,7 @@ describe("Secure checkout", () => {
     expect(writes.find((w) => w.sql.startsWith("INSERT INTO dossier_orders"))?.values[1]).toBe("hashed-private-token");
     const call = fetchMock.mock.calls[1]; const options = call?.[1] as RequestInit;
     expect((options.headers as Record<string, string>)["Idempotency-Key"]).toBe(`dossier-${orderId}`);
-    const body = new URLSearchParams(String(options.body)); expect(body.get("line_items[0][price]")).toBe("price_test"); expect(body.get("automatic_tax[enabled]")).toBe("true"); expect(body.get("success_url")).not.toContain(data.accessToken);
+    const body = new URLSearchParams(String(options.body)); expect(body.get("line_items[0][price]")).toBe("price_test"); expect(body.get("automatic_tax[enabled]")).toBe("true"); expect(body.get("branding_settings[display_name]")).toBe("TenderAtlas"); expect(body.get("payment_intent_data[statement_descriptor_suffix]")).toBe("TENDERATLAS"); expect(body.get("success_url")).not.toContain(data.accessToken);
   });
   it("does not create orders after failed anti-spam verification", async () => {
     const { db, writes } = fakeDb(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(price))); vi.mocked(verifyTurnstile).mockResolvedValue(false);
@@ -94,5 +94,13 @@ describe("flat price without Stripe Tax", () => {
     const price = { id: "price_x", active: true, type: "one_time", currency: "eur", unit_amount: 29000, tax_behavior: "unspecified" };
     expect(validDossierPrice(price, "price_x", false)).toBe(true);
     expect(validDossierPrice(price, "price_x", true)).toBe(false);
+  });
+});
+
+describe("checkout branding fallback", () => {
+  it("strips only the branding fields", async () => {
+    const { withoutBranding } = await import("./checkout");
+    const plain = new URLSearchParams(withoutBranding(new URLSearchParams({ mode: "payment", "branding_settings[display_name]": "TenderAtlas", "payment_intent_data[statement_descriptor_suffix]": "TENDERATLAS" }).toString()));
+    expect(plain.get("mode")).toBe("payment"); expect(plain.has("branding_settings[display_name]")).toBe(false); expect(plain.has("payment_intent_data[statement_descriptor_suffix]")).toBe(false);
   });
 });
