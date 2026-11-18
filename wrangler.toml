@@ -11,3 +11,11 @@ binding = "DB"
 database_name = "tender-atlas"
 database_id = "9ffda723-5a30-45e9-8434-9ded260134db"
 migrations_dir = "migrations"
+
+# Public (non-secret) settings for paid dossiers. Checkout stays closed automatically
+# until every secret below is also set (see src/lib/dossier/checkout.ts availability()):
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, TURNSTILE_SECRET_KEY, RESEND_API_KEY, NOTIFICATION_TO_EMAIL
+[vars]
+STRIPE_PRICE_ID = "price_1Ud77vByiix0wtyTAeUNiy5Z"
+NOTIFICATION_FROM_EMAIL = "Tender Atlas <orders@tenderatlas.shop>"
+DOSSIER_SALES_OPEN = "true"
