@@ -14,6 +14,9 @@ type Rewriter = {
 type RewriterCtor = new () => Rewriter;
 
 const ORIGIN = SEO.origin.replace(/\/$/, "");
+// Optional Google AdSense (auto ads). Set SEO.adsenseClient = "ca-pub-…" in src/seo.config.ts to enable the
+// head script and /ads.txt; empty = no ad code shipped at all.
+const ADSENSE = String((SEO as { adsenseClient?: string }).adsenseClient ?? "").trim();
 const CANON_HOST = new URL(ORIGIN).hostname;
 
 function canonicalPath(pathname: string) {
@@ -25,6 +28,10 @@ export function seoPreflight(request: Request): Response | null {
   if (request.method !== "GET" && request.method !== "HEAD") return null;
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
+  if (ADSENSE && url.pathname === "/ads.txt") {
+    return new Response(`google.com, ${ADSENSE.replace(/^ca-/, "")}, DIRECT, f08c47fec0942fa0
+`, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" } });
+  }
   const redirectHosts = [SEO.pagesDevHost, `www.${CANON_HOST}`].filter(Boolean) as string[];
   if (redirectHosts.includes(host)) {
     return Response.redirect(`${ORIGIN}${url.pathname}${url.search}`, 301);
@@ -95,6 +102,7 @@ export function seoRewrite(request: Request, response: Response): Response {
         if (!s.canonical) html += `<link rel="canonical" href="${canonical}"/>`;
         if (!s.ogUrl) html += `<meta property="og:url" content="${canonical}"/>`;
         if (!s.robots) html += `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"/>`;
+        if (ADSENSE) html += `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE}" crossorigin="anonymous"></script>`;
         if (html) end.before(html, { html: true });
       });
     } })

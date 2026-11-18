@@ -12,6 +12,8 @@ export const SEO = {
   sameAs: [] as string[],
   sectionNames: {} as Record<string, string>,
   keepTrailingSlash: false,
+  // Google AdSense publisher ID ("ca-pub-…"). Empty = no ad code and no /ads.txt.
+  adsenseClient: "",
 };
 
 export const LLMS_NOTES: string[] = [
