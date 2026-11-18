@@ -1,3 +1,4 @@
+import { setCfEnv } from "./lib/cf-env";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -50,6 +51,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 // twice and renders garbled.
 export default {
   async scheduled(event: { cron: string }, env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+    setCfEnv(env);
     const { ingestIncremental, sendDueAlerts } = await import("./lib/scheduled");
     ctx.waitUntil((async () => {
       const environment = env as Parameters<typeof ingestIncremental>[0];
@@ -58,6 +60,7 @@ export default {
     })().catch((error) => console.error("Scheduled TenderAtlas job failed", error)));
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    setCfEnv(env);
     const redirect = seoPreflight(request);
     if (redirect) return redirect;
     try {

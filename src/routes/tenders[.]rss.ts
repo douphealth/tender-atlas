@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { cfBinding } from "@/lib/cf-env";
 import { parseSearch } from "@/lib/procurement/sources";
 import { searchWithStore, type AtlasEnv } from "@/lib/procurement/store";
 import { abs } from "@/lib/site";
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/tenders.rss")({
   server: { handlers: { GET: async ({ request }) => {
     const url = new URL(request.url);
     const params = parseSearch(Object.fromEntries(url.searchParams));
-    const env: AtlasEnv = { DB: process.env["DB"] as unknown as AtlasEnv["DB"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"] };
+    const env: AtlasEnv = { DB: cfBinding("DB") as unknown as AtlasEnv["DB"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"] };
     const result = await searchWithStore(params, env);
     const items = result.items.map((n) => {
       const link = abs(`/tenders/${n.source}/${encodeURIComponent(n.noticeId)}`);

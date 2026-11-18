@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import { cfBinding } from "@/lib/cf-env";
 import { cached } from "./procurement/cache";
 import { listStoredBuyers, storedBuyer, type AtlasEnv, type BuyerProfile, type BuyerSummary } from "./procurement/store";
 import { collect } from "./procurement/sources";
 import { buyerSlug } from "./procurement/reconcile";
 
-const env = (): AtlasEnv => ({ SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DB: process.env["DB"] as unknown as AtlasEnv["DB"] });
+const env = (): AtlasEnv => ({ SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DB: cfBinding("DB") as unknown as AtlasEnv["DB"] });
 
 async function liveBuyers(): Promise<BuyerSummary[]> {
   const result = await cached("buyers:live", 15 * 60_000, () => collect({ q: "", source: "all", country: "", days: 7, page: 1, cpv: "", deadline: "any" }, env(), ["ted", "fr", "wb"]));

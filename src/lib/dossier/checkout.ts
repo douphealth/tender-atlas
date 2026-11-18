@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cfBinding } from "@/lib/cf-env";
 import { DOSSIER_OFFER, validDossierPrice, type DossierAvailability } from "./offer";
 import type { AtlasEnv } from "../procurement/store";
 import { storedNotice } from "../procurement/store";
@@ -20,7 +21,7 @@ export function orderableNotice(n: Notice, now = Date.now()): boolean {
   return n.stage === "competition" && n.status === "open" && !!n.url && !!n.deadlineAt && Date.parse(n.deadlineAt) - now > 4 * 86400000;
 }
 export function dossierEnvironment(): DossierEnv {
-  return { DB: process.env["DB"] as unknown as AtlasEnv["DB"], STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"], STRIPE_PRICE_ID: process.env["STRIPE_PRICE_ID"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DOSSIER_SALES_OPEN: process.env["DOSSIER_SALES_OPEN"], STRIPE_WEBHOOK_SECRET: process.env["STRIPE_WEBHOOK_SECRET"], RESEND_API_KEY: process.env["RESEND_API_KEY"], NOTIFICATION_FROM_EMAIL: process.env["NOTIFICATION_FROM_EMAIL"], NOTIFICATION_TO_EMAIL: process.env["NOTIFICATION_TO_EMAIL"] };
+  return { DB: cfBinding("DB") as unknown as AtlasEnv["DB"], STRIPE_SECRET_KEY: process.env["STRIPE_SECRET_KEY"], STRIPE_PRICE_ID: process.env["STRIPE_PRICE_ID"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"], DOSSIER_SALES_OPEN: process.env["DOSSIER_SALES_OPEN"], STRIPE_WEBHOOK_SECRET: process.env["STRIPE_WEBHOOK_SECRET"], RESEND_API_KEY: process.env["RESEND_API_KEY"], NOTIFICATION_FROM_EMAIL: process.env["NOTIFICATION_FROM_EMAIL"], NOTIFICATION_TO_EMAIL: process.env["NOTIFICATION_TO_EMAIL"] };
 }
 async function stripe(env: DossierEnv, path: string, options: RequestInit = {}) {
   const response = await fetch(`https://api.stripe.com/v1/${path}`, { ...options, signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...options.headers } });

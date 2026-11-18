@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { cfBinding } from "@/lib/cf-env";
 import satori from "satori";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import fontData from "@/assets/atlas-sans.ttf?inline";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/og/tenders/$")({
     const filename = segments.join("/");
     const id = filename.endsWith(".png") ? filename.slice(0, -4) : "";
     if (!source || !id) return new Response("Not found", { status: 404 });
-    const env: AtlasEnv = { DB: process.env["DB"] as unknown as AtlasEnv["DB"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"] };
+    const env: AtlasEnv = { DB: cfBinding("DB") as unknown as AtlasEnv["DB"], SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"] };
     const notice = await fetchNotice(source, id, env) ?? await storedNotice(source, id, env.DB);
     if (!notice) {
       console.warn("Social card notice not found", { source, id });

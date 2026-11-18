@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { cfBinding } from "@/lib/cf-env";
 import { cached } from "./cache";
 import { fetchNotice, parseSearch, type SearchResult } from "./sources";
 import type { SourceKey } from "./catalog";
@@ -6,7 +7,7 @@ import { searchWithStore, storedNotice, type AtlasEnv } from "./store";
 
 const env = (): AtlasEnv => ({
   SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"],
-  DB: process.env["DB"] as unknown as AtlasEnv["DB"],
+  DB: cfBinding("DB") as unknown as AtlasEnv["DB"],
 });
 
 export const searchTenders = createServerFn({ method: "GET" })

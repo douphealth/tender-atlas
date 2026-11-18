@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { cfBinding } from "@/lib/cf-env";
 import { z } from "zod";
 import type { AtlasEnv } from "@/lib/procurement/store";
 import { alertQuerySchema, emailSchema, escapeHtml, emailLayout, sendEmail, tokenHash, verifyTurnstile } from "@/lib/notifications";
@@ -6,7 +7,7 @@ import { abs } from "@/lib/site";
 
 const input = z.object({ email: emailSchema, query: alertQuerySchema, turnstileToken: z.string().max(2048), website: z.string().max(0).optional().or(z.literal("")) }).strict();
 const env = (): AtlasEnv => ({
-  DB: process.env["DB"] as unknown as AtlasEnv["DB"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"],
+  DB: cfBinding("DB") as unknown as AtlasEnv["DB"], TURNSTILE_SECRET_KEY: process.env["TURNSTILE_SECRET_KEY"],
   RESEND_API_KEY: process.env["RESEND_API_KEY"], NOTIFICATION_FROM_EMAIL: process.env["NOTIFICATION_FROM_EMAIL"],
 });
 

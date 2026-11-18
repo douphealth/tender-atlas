@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { cfBinding } from "@/lib/cf-env";
 import { COUNTRIES, CPV_DIVISIONS } from "@/lib/procurement/catalog";
 import { sitemapHubRows, sitemapNoticeRows, type AtlasEnv } from "@/lib/procurement/store";
 import { abs } from "@/lib/site";
@@ -7,7 +8,7 @@ const xmlEscape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: { handlers: { GET: async () => {
-    const db = process.env["DB"] as unknown as AtlasEnv["DB"];
+    const db = cfBinding("DB") as unknown as AtlasEnv["DB"];
     const paths = ["/", "/tenders", "/countries", "/cpv", "/buyers", "/alerts", "/methodology", "/pricing", "/privacy",
       ...COUNTRIES.map((c) => `/countries/${c.iso2}/tenders`), ...CPV_DIVISIONS.map((d) => `/cpv/${d.code}`)];
     const [notices, hubs] = await Promise.all([sitemapNoticeRows(db), sitemapHubRows(db)]);
