@@ -156,8 +156,55 @@ export async function sitemapHubRows(db?: D1Database): Promise<{ country: string
   try {
     const rows = await db.prepare(`SELECT n.country AS country, substr(j.value, 1, 2) || '000000' AS division,
       MAX(COALESCE(n.updated_at, n.published_at)) AS lastmod FROM notices n, json_each(n.cpv) j
-      WHERE n.country IS NOT NULL GROUP BY n.country, division HAVING COUNT(*) >= 5 LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
+      WHERE n.country IS NOT NULL AND COALESCE(n.published_at, n.updated_at) >= date('now', '-30 days')
+      GROUP BY n.country, division HAVING COUNT(*) >= 5 LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
     return rows.results;
+  } catch { return []; }
+}
+
+/**
+ * Countries (ISO3) and CPV divisions with at least 5 notices in the last 30 days: the same window and
+ * threshold the country and CPV pages use before they allow indexing. Null when the store is unavailable.
+ */
+export async function sitemapListingCoverage(db?: D1Database): Promise<{ countries: Set<string>; divisions: Set<string> } | null> {
+  if (!db) return null;
+  try {
+    const recent = `COALESCE(published_at, updated_at) >= date('now', '-30 days')`;
+    const [countries, divisions] = await Promise.all([
+      db.prepare(`SELECT country AS k FROM notices WHERE country IS NOT NULL AND ${recent} GROUP BY country HAVING COUNT(*) >= 5`).all<{ k: string }>(),
+      db.prepare(`SELECT substr(j.value, 1, 2) || '000000' AS k FROM notices n, json_each(n.cpv) j
+        WHERE ${recent.replace(/published_at|updated_at/g, (c) => `n.${c}`)} GROUP BY k HAVING COUNT(DISTINCT n.source || ':' || n.notice_id) >= 5`).all<{ k: string }>(),
+    ]);
+    return { countries: new Set(countries.results.map((r) => r.k)), divisions: new Set(divisions.results.map((r) => r.k)) };
+  } catch { return null; }
+}
+
+/**
+ * Up to `limit` stored notices related to one tender: other notices from the same buyer first, then
+ * open notices in the same country and CPV division. Excludes the tender itself. Empty when D1 is unavailable.
+ */
+export async function relatedStored(n: { source: string; noticeId: string; buyer: string | null; country: string | null; cpv: string[] }, db?: D1Database, limit = 6): Promise<Notice[]> {
+  if (!db) return [];
+  try {
+    const self = `${n.source}:${n.noticeId}`;
+    const seen = new Set([self]);
+    const out: Notice[] = [];
+    const take = (rows: { payload: string; value_eur: number | null }[]) => {
+      for (const r of rows) { const x = rowNotice(r); const k = `${x.source}:${x.noticeId}`; if (!seen.has(k) && out.length < limit) { seen.add(k); out.push(x); } }
+    };
+    if (n.buyer) {
+      const rows = await db.prepare("SELECT payload, value_eur FROM notices WHERE buyer_slug = ? ORDER BY published_at DESC LIMIT 8").bind(buyerSlug(n.buyer)).all<{ payload: string; value_eur: number | null }>();
+      take(rows.results);
+    }
+    const division = n.cpv[0]?.slice(0, 2);
+    if (out.length < limit && n.country) {
+      const rows = division
+        ? await db.prepare(`SELECT n.payload, n.value_eur FROM notices n WHERE n.country = ? AND n.status = 'open'
+            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(n.country, division).all<{ payload: string; value_eur: number | null }>()
+        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(n.country).all<{ payload: string; value_eur: number | null }>();
+      take(rows.results);
+    }
+    return out;
   } catch { return []; }
 }
 

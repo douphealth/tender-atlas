@@ -18,6 +18,9 @@ const ORIGIN = SEO.origin.replace(/\/$/, "");
 // head script and /ads.txt; empty = no ad code shipped at all.
 const ADSENSE = String((SEO as { adsenseClient?: string }).adsenseClient ?? "").trim();
 const CANON_HOST = new URL(ORIGIN).hostname;
+// Site-wide social preview image (1200x630, public/og-image.png). Used only on pages that set no og:image.
+const OG_IMAGE = `${ORIGIN}${(SEO as { ogImage?: string }).ogImage ?? "/og-image.png"}`;
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 function canonicalPath(pathname: string) {
   return pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
@@ -84,7 +87,7 @@ export function seoRewrite(request: Request, response: Response): Response {
   const url = new URL(request.url);
   if (url.hostname !== CANON_HOST) return response;
   const canonical = `${ORIGIN}${canonicalPath(url.pathname)}`;
-  const s = { canonical: false, ogUrl: false, robots: false, noindex: false, title: "", desc: "", ld: "" };
+  const s = { canonical: false, ogUrl: false, robots: false, noindex: false, ogImage: false, twCard: false, title: "", desc: "", ld: "" };
   const onCanon = (h: string | null) => !h || !h.startsWith(ORIGIN);
   return new Ctor()
     .on('link[rel="canonical"]', { element: (el: { getAttribute(n: string): string | null; setAttribute(n: string, v: string): void }) => { s.canonical = true; if (onCanon(el.getAttribute("href"))) el.setAttribute("href", canonical); } })
@@ -92,6 +95,12 @@ export function seoRewrite(request: Request, response: Response): Response {
     .on('meta[name="robots"]', { element: (el: { getAttribute(n: string): string | null }) => { s.robots = true; if (/noindex/i.test(el.getAttribute("content") ?? "")) s.noindex = true; } })
     .on('meta[name="author"][content="Lovable"]', { element: (el: { remove(): void }) => el.remove() })
     .on('meta[name="twitter:site"][content="@Lovable"]', { element: (el: { remove(): void }) => el.remove() })
+    .on('meta[property="og:image"]', { element: () => { s.ogImage = true; } })
+    .on('meta[name="twitter:card"]', { element: (el: { getAttribute(n: string): string | null; setAttribute(n: string, v: string): void }) => {
+      s.twCard = true;
+      // Pages without their own image get the large site image, so the card should be large too.
+      if (!s.ogImage && el.getAttribute("content") === "summary") el.setAttribute("content", "summary_large_image");
+    } })
     .on('meta[name="description"]', { element: (el: { getAttribute(n: string): string | null }) => { s.desc = el.getAttribute("content") ?? ""; } })
     .on("title", { text: (t: { text: string }) => { s.title += t.text; } })
     .on('script[type="application/ld+json"]', { text: (t: { text: string }) => { s.ld += t.text; } })
@@ -101,6 +110,11 @@ export function seoRewrite(request: Request, response: Response): Response {
         let html = "";
         if (!s.canonical) html += `<link rel="canonical" href="${canonical}"/>`;
         if (!s.ogUrl) html += `<meta property="og:url" content="${canonical}"/>`;
+        if (!s.ogImage) {
+          const alt = esc(decode(s.title) || SEO.name);
+          html += `<meta property="og:image" content="${OG_IMAGE}"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta property="og:image:alt" content="${alt}"/><meta name="twitter:image" content="${OG_IMAGE}"/>`;
+          if (!s.twCard) html += `<meta name="twitter:card" content="summary_large_image"/>`;
+        }
         if (!s.robots) html += `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"/>`;
         if (ADSENSE) html += `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE}" crossorigin="anonymous"></script>`;
         if (html) end.before(html, { html: true });

@@ -3,7 +3,7 @@ import { cfBinding } from "@/lib/cf-env";
 import { cached } from "./cache";
 import { fetchNotice, parseSearch, type SearchResult } from "./sources";
 import type { SourceKey } from "./catalog";
-import { searchWithStore, storedNotice, type AtlasEnv } from "./store";
+import { relatedStored, searchWithStore, storedNotice, type AtlasEnv } from "./store";
 
 const env = (): AtlasEnv => ({
   SAM_GOV_API_KEY: process.env["SAM_GOV_API_KEY"],
@@ -27,3 +27,11 @@ export const getTender = createServerFn({ method: "GET" })
       return live ?? storedNotice(data.source, data.id, environment.DB);
     });
   });
+
+/** Related stored notices for a tender page (same buyer, then same country + CPV division). */
+export const getRelatedTenders = createServerFn({ method: "GET" })
+  .inputValidator((input: { source: string; noticeId: string; buyer: string | null; country: string | null; cpv: string[] }) => ({
+    source: String(input.source), noticeId: String(input.noticeId).slice(0, 160), buyer: input.buyer ? String(input.buyer).slice(0, 300) : null,
+    country: input.country ? String(input.country).slice(0, 3) : null, cpv: Array.isArray(input.cpv) ? input.cpv.slice(0, 5).map(String) : [],
+  }))
+  .handler(async ({ data }) => cached(`r:${data.source}:${data.noticeId}`, 30 * 60_000, () => relatedStored(data, env().DB)));

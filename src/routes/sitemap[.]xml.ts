@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { cfBinding } from "@/lib/cf-env";
 import { COUNTRIES, CPV_DIVISIONS } from "@/lib/procurement/catalog";
-import { sitemapHubRows, sitemapNoticeRows, type AtlasEnv } from "@/lib/procurement/store";
+import { sitemapHubRows, sitemapListingCoverage, sitemapNoticeRows, type AtlasEnv } from "@/lib/procurement/store";
 import { abs } from "@/lib/site";
 
 const xmlEscape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]!);
@@ -9,9 +9,11 @@ const xmlEscape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&
 export const Route = createFileRoute("/sitemap.xml")({
   server: { handlers: { GET: async () => {
     const db = cfBinding("DB") as unknown as AtlasEnv["DB"];
+    const [notices, hubs, coverage] = await Promise.all([sitemapNoticeRows(db), sitemapHubRows(db), sitemapListingCoverage(db)]);
+    // Only list country and CPV pages that clear their own noindex threshold (5+ notices in 30 days).
     const paths = ["/", "/tenders", "/countries", "/cpv", "/buyers", "/alerts", "/methodology", "/pricing", "/privacy",
-      ...COUNTRIES.map((c) => `/countries/${c.iso2}/tenders`), ...CPV_DIVISIONS.map((d) => `/cpv/${d.code}`)];
-    const [notices, hubs] = await Promise.all([sitemapNoticeRows(db), sitemapHubRows(db)]);
+      ...COUNTRIES.filter((c) => !coverage || coverage.countries.has(c.iso3)).map((c) => `/countries/${c.iso2}/tenders`),
+      ...CPV_DIVISIONS.filter((d) => !coverage || coverage.divisions.has(d.code)).map((d) => `/cpv/${d.code}`)];
     const noticeUrls = notices.map((n) => ({ path: `/tenders/${n.source}/${encodeURIComponent(n.notice_id)}`, lastmod: n.updated_at ?? n.published_at }));
     const hubUrls = hubs.flatMap((h) => {
       const country = COUNTRIES.find((c) => c.iso3 === h.country);

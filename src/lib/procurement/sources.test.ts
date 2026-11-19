@@ -32,6 +32,7 @@ describe("procurement rules", () => {
   });
   it("builds TED queries with country and CPV", () => {
     expect(tedQuery({ q: "", country: "DEU", days: 7, cpv: "72000000-5" })).toContain("buyer-country = DEU AND classification-cpv = 72000000");
+    expect(tedQuery({ q: "", country: "", days: 7, cpv: "" })).toMatch(/SORT BY publication-date DESC$/);
   });
   it("does not index thin notices", () => {
     expect(isIndexable(normalize({ source: "ted", noticeId: "1-2026", title: "X", url: "https://ted.europa.eu" }))).toBe(false);

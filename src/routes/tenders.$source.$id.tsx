@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { getTender } from "@/lib/procurement/api";
+import { getRelatedTenders, getTender } from "@/lib/procurement/api";
+import { RespondGuide } from "@/components/atlas/RespondGuide";
 import { SOURCES, countryByIso3, cpvDivisionFor } from "@/lib/procurement/catalog";
 import { isIndexable, makeIcs, unknowns } from "@/lib/procurement/sources";
 import { StatusPill } from "@/components/atlas/TenderList";
@@ -10,17 +11,24 @@ import { useWorkspace } from "@/lib/workspace";
 import { buyerSlug } from "@/lib/procurement/reconcile";
 import { DossierOrder } from "@/components/atlas/DossierOrder";
 
+/** Word-boundary title with the notice ID, so notices that share a generic title stay distinguishable. */
+function tenderTitle(title: string, id: string) {
+  const clean = title.replace(/\s+/g, " ").trim();
+  const cut = clean.length <= 56 ? clean : `${clean.slice(0, 56).replace(/\s+\S*$/, "")}…`;
+  return `${cut} · ${id}`;
+}
 export const Route = createFileRoute("/tenders/$source/$id")({
   loader: async ({ params }) => {
     const n = await getTender({ data: params });
     if (!n) throw notFound();
-    return n;
+    const related = await getRelatedTenders({ data: { source: n.source, noticeId: n.noticeId, buyer: n.buyer, country: n.country, cpv: n.cpv } }).catch(() => []);
+    return { ...n, related };
   },
   head: ({ loaderData: n, params }) => {
     if (!n) return pageHead({ title: "Tender not found", description: "This notice could not be found at its official source.", path: `/tenders/${params.source}/${params.id}`, noindex: true });
     const where = countryByIso3(n.country)?.name ?? n.countryName;
     return pageHead({
-      title: n.title.slice(0, 70),
+      title: tenderTitle(n.title, n.noticeId),
       description: `${n.buyer ?? "Public buyer"}${where ? `, ${where}` : ""}. ${n.deadlineAt ? `Deadline ${n.deadlineAt}. ` : ""}Official ${SOURCES[n.source].label} notice ${n.noticeId}.`.slice(0, 160),
       path: `/tenders/${n.source}/${n.noticeId}`,
       image: abs(`/og/tenders/${n.source}/${encodeURIComponent(n.noticeId)}.png`),
@@ -97,6 +105,21 @@ function TenderPage() {
           {n.description && (<><h2 className="mt-8 text-xl font-semibold">Description (from the publisher)</h2><p className="mt-3 whitespace-pre-line leading-relaxed">{n.description}</p></>)}
           {n.documents.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Document manifest</h2><p className="mt-1 text-xs text-muted-foreground">Publisher-disclosed links. Files are not mirrored; access requirements and integrity remain controlled by the publisher.</p><ul className="mt-3 space-y-2 text-sm">{n.documents.map((d) => <li key={d.url} className="rounded-sm border border-border p-3"><a href={d.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">{d.label} ↗</a></li>)}</ul></>)}
           {n.relatedNotices && n.relatedNotices.length > 0 && (<><h2 className="mt-8 text-xl font-semibold">Matched official register records</h2><p className="mt-1 text-sm text-muted-foreground">These records matched exactly on buyer, title, country and deadline. Review each official version.</p><ul className="mt-3 space-y-2">{n.relatedNotices.map((r) => <li key={`${r.source}:${r.noticeId}`}><Link to="/tenders/$source/$id" params={{ source: r.source, id: r.noticeId }} className="text-accent underline">{SOURCES[r.source].label} · {r.noticeId}</Link>{r.url && <> · <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground underline">official record ↗</a></>}</li>)}</ul></>)}
+          <RespondGuide source={n.source} />
+          {n.related.length > 0 && (
+            <section className="mt-8">
+              <h2 className="text-xl font-semibold">Related tenders</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Other notices from this buyer, then open notices in the same country and category.</p>
+              <ul className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
+                {n.related.map((r) => (
+                  <li key={r.id} className="px-4 py-3">
+                    <Link to="/tenders/$source/$id" params={{ source: r.source, id: r.noticeId }} className="font-medium hover:text-accent hover:underline">{r.title}</Link>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{r.buyer ?? "Public buyer"} · {SOURCES[r.source].label} · {r.deadlineAt ? `due ${fmtDate(r.deadlineAt)}` : `published ${fmtDate(r.publishedAt)}`}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
         <aside className="space-y-6">
           <DossierOrder key={n.id} notice={n} />

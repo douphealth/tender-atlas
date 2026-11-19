@@ -215,7 +215,8 @@ export function tedQuery(p: Pick<SearchParams, "q" | "country" | "days" | "cpv">
   if (/^\d{8}/.test(p.cpv)) parts.push(`classification-cpv = ${p.cpv.slice(0, 8)}`);
   const terms = (p.q.match(/[\p{L}\p{N}]+/gu) || []).filter((t) => t.length > 1).slice(0, 6).map((t) => t.slice(0, 35));
   if (terms.length) parts.push(terms.length === 1 ? `FT ~ ${terms[0]}` : `FT ~ (${terms.join(" ")})`);
-  return parts.join(" AND ");
+  // TED returns the oldest matches first unless told otherwise; newest-first keeps search and ingestion fresh.
+  return `${parts.join(" AND ")} SORT BY publication-date DESC`;
 }
 function tedMap(n: any): Notice | null {
   const id = text(n["publication-number"], 60);

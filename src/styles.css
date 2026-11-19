@@ -29,6 +29,11 @@
  * 2. Register it in @theme inline as --color-<name>: var(--<name>)
  */
 
+/* Metric-matched fallback for Fraunces, so headings keep their line breaks while the web font loads
+   (measured: Georgia Bold is ~10% wider than Fraunces 600; Georgia Regular ~3% narrower than Fraunces 500). */
+@font-face { font-family: "Fraunces Fallback"; src: local("Georgia"); font-weight: 100 549; size-adjust: 103%; }
+@font-face { font-family: "Fraunces Fallback"; src: local("Georgia Bold"), local("Georgia-Bold"); font-weight: 550 900; size-adjust: 90.3%; }
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -74,7 +79,7 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-ink-deep: var(--ink-deep);
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Fraunces", "Fraunces Fallback", ui-serif, Georgia, serif;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
