@@ -160,7 +160,7 @@ export async function sitemapHubRows(db?: D1Database): Promise<{ country: string
     const rows = await db.prepare(`SELECT n.country AS country, substr(j.value, 1, 2) || '000000' AS division,
       MAX(COALESCE(n.updated_at, n.published_at)) AS lastmod FROM notices n, json_each(n.cpv) j
       WHERE n.country IS NOT NULL AND COALESCE(n.published_at, n.updated_at) >= date('now', '-30 days')
-      GROUP BY n.country, division HAVING COUNT(*) >= 5 LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
+      GROUP BY n.country, division HAVING COUNT(DISTINCT n.id) >= 5 LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
     return rows.results;
   } catch { return []; }
 }
