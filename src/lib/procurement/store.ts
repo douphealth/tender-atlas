@@ -129,6 +129,9 @@ export async function ingestIncremental(env: AtlasEnv): Promise<{ stored: number
       const pages = source === "uk" ? 1 : 3;
       for (let page = 1; page <= pages; page++) {
         const result = await collect({ q: "", source, country: "", days: 7, page, cpv: "", deadline: "any" }, env, [source]);
+        // collect() records publisher failures in health instead of throwing; surface them in the report.
+        const h = result.health?.[source];
+        if (!result.items.length && h && h.status !== "ok") throw new Error(`${h.status}: ${h.message ?? "no message"}`);
         const notices = result.items.map((n) => ({ ...n, valueEur: toEur(n.value, n.currency, rates) }));
         sourceCount += await upsertNotices(env.DB, notices);
         if (result.items.length < 20) break;
