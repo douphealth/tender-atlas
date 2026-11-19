@@ -197,8 +197,10 @@ async function remoteJSON(url: string, opt: RequestInit = {}): Promise<any> {
   try {
     const r = await fetch(url, { ...opt, signal: c.signal, headers: { Accept: "application/json", "User-Agent": "TenderAtlas/1.0 (+https://tenderatlas.shop/methodology)", ...(opt.headers || {}) } });
     if (!r.ok) throw new Error(r.status === 429 ? "Rate limited by publisher" : `Publisher HTTP ${r.status}`);
-    if (!/json/i.test(r.headers.get("content-type") || "")) throw new Error("Publisher returned non-JSON");
-    return await r.json();
+    if (/json/i.test(r.headers.get("content-type") || "")) return await r.json();
+    // Some publishers (e.g. the World Bank API) send JSON labelled text/plain; accept it only if it parses.
+    const body = await r.text();
+    try { return JSON.parse(body); } catch { throw new Error("Publisher returned non-JSON"); }
   } catch (e: any) {
     if (e?.name === "AbortError") throw new Error("Publisher timed out");
     throw e;
