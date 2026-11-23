@@ -67,8 +67,14 @@ export default {
     const redirect = seoPreflight(request);
     if (redirect) return redirect;
     try {
-      // Public pages are cached at the edge for 300s (see lib/edge-cache.ts).
-      return await withEdgeCache(request, ctx, { ttl: 300, skip: (p) => /^\/(api|app|alerts)(\/|$)/.test(p) }, async () => {
+      // Public pages: listings fresh for 5 min, notices (which rarely change) for 1 h; after that the
+      // cached copy is served instantly while re-rendering in the background. See lib/edge-cache.ts.
+      return await withEdgeCache(request, ctx, {
+        ttl: 300,
+        swr: 3600,
+        ttlFor: (p) => (p.startsWith("/tenders/") ? { ttl: 3600, swr: 86400 } : null),
+        skip: (p) => /^\/(api|app|alerts)(\/|$)/.test(p),
+      }, async () => {
         const handler = await getServerEntry();
         const response = await handler.fetch(request, env, ctx);
         return seoRewrite(request, await normalizeCatastrophicSsrResponse(response));
