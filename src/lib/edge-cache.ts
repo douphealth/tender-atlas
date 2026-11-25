@@ -1,7 +1,7 @@
 // Edge cache for server-rendered public HTML (Cloudflare Cache API), with stale-while-revalidate.
 // A page younger than `ttl` is served as is. Between `ttl` and `ttl + swr` the cached copy is served
 // immediately and re-rendered in the background, so visitors and crawlers almost never wait for a
-// full render. Only anonymous GET requests for HTML that rendered with 200 and set no cookie are stored.
+// full render. Only anonymous GET requests for HTML or XML that rendered with 200 and set no cookie are stored.
 
 // Unique per build (vite.config.ts `define`). Part of the cache key, so a deploy never serves HTML that
 // points at the previous build's JS/CSS files (Pages keeps only the current deployment's assets).
@@ -26,7 +26,8 @@ export async function withEdgeCache(request: Request, ctx: unknown, opts: Opts, 
 
   const store = async (response: Response): Promise<void> => {
     const type = response.headers.get("content-type") ?? "";
-    if (response.status !== 200 || !type.includes("text/html") || response.headers.has("set-cookie")) return;
+    // HTML pages plus XML feeds (sitemap, RSS), whose D1 queries ran on every crawler fetch.
+    if (response.status !== 200 || !/text\/html|xml/.test(type) || response.headers.has("set-cookie")) return;
     const stored = new Response(response.body, response);
     stored.headers.set("cache-control", `public, max-age=${ttl + swr}`);
     stored.headers.set("x-cached-at", String(Date.now()));

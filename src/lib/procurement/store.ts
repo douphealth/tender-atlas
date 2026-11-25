@@ -2,6 +2,7 @@ import { SOURCE_KEYS, SOURCES, type SourceKey } from "./catalog";
 import { collect, cpvPrefix, type Env, type Notice, type SearchParams, type SearchResult } from "./sources";
 import { officialEuroRates, toEur } from "./money";
 import { buyerSlug, reconcileNotices } from "./reconcile";
+import { sharedCached } from "./cache";
 
 export interface D1Statement {
   bind(...values: unknown[]): D1Statement;
@@ -27,11 +28,16 @@ const pageSize = 50;
 const json = (value: unknown) => JSON.stringify(value);
 const rowNotice = (row: { payload: string; value_eur?: number | null }): Notice => ({ ...JSON.parse(row.payload), valueEur: row.value_eur ?? null });
 
+// When each database was last found fresh, per isolate: the check runs before every stored search.
+const freshCheckedAt = new WeakMap<D1Database, number>();
 async function usableDb(db?: D1Database): Promise<D1Database | null> {
   if (!db) return null;
+  if (Date.now() - (freshCheckedAt.get(db) ?? 0) < 60_000) return db;
   try {
-    const row = await db.prepare("SELECT COUNT(*) AS count, MAX(last_seen_at) AS fresh FROM notices").first<{ count: number; fresh: string | null }>();
-    if (!row?.count || !row.fresh || Date.now() - Date.parse(row.fresh) > 26 * 60 * 60_000) return null;
+    // MAX over notices_last_seen_idx reads one row; an empty table gives null. (COUNT(*) read every row.)
+    const row = await db.prepare("SELECT MAX(last_seen_at) AS fresh FROM notices").first<{ fresh: string | null }>();
+    if (!row?.fresh || Date.now() - Date.parse(row.fresh) > 26 * 60 * 60_000) return null;
+    freshCheckedAt.set(db, Date.now());
     return db;
   } catch { return null; }
 }
@@ -201,11 +207,13 @@ export async function relatedStored(n: { source: string; noticeId: string; buyer
     }
     const division = n.cpv[0]?.slice(0, 2);
     if (out.length < limit && n.country) {
-      const rows = division
+      const country = n.country;
+      // Shared by every tender in the same country and division, so cache it across tender pages.
+      const rows = await sharedCached(`related:${country}:${division ?? ""}`, 3 * 3600, async () => (division
         ? await db.prepare(`SELECT n.payload, n.value_eur FROM notices n WHERE n.country = ? AND n.status = 'open'
-            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(n.country, division).all<{ payload: string; value_eur: number | null }>()
-        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(n.country).all<{ payload: string; value_eur: number | null }>();
-      take(rows.results);
+            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(country, division).all<{ payload: string; value_eur: number | null }>()
+        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(country).all<{ payload: string; value_eur: number | null }>()).results);
+      take(rows);
     }
     return out;
   } catch { return []; }
