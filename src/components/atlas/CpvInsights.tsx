@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { SOURCES } from "@/lib/procurement/catalog";
+import { SOURCES, countryByIso3 } from "@/lib/procurement/catalog";
 import type { Notice } from "@/lib/procurement/sources";
 
 /** Per-division summary computed only from the notices already loaded for the page. */
@@ -11,23 +11,26 @@ export function CpvInsights({ division, items }: { division: { code: string; nam
   const open = items.filter((n) => n.deadlineAt && Date.parse(n.deadlineAt) > now);
   const valued = items.filter((n) => typeof n.valueEur === "number" && n.valueEur! > 0);
   const total = valued.reduce((s, n) => s + (n.valueEur as number), 0);
-  const byCountry = new Map<string, { name: string; n: number; open: number; value: number }>();
+  const byCountry = new Map<string, { name: string; iso2?: string; n: number; open: number; value: number }>();
   for (const n of items) {
-    const k = n.countryName ?? "Not stated";
-    const e = byCountry.get(k) ?? { name: k, n: 0, open: 0, value: 0 };
+    // Most sources carry only an ISO3 code; resolve it before falling back to a free-text name.
+    const c = countryByIso3(n.country);
+    const k = c?.name ?? n.countryName ?? "Not stated";
+    const e = byCountry.get(k) ?? { name: k, ...(c ? { iso2: c.iso2 } : {}), n: 0, open: 0, value: 0 };
     e.n++; if (open.includes(n)) e.open++; if (typeof n.valueEur === "number") e.value += n.valueEur; byCountry.set(k, e);
   }
   const countries = [...byCountry.values()].sort((a, b) => b.n - a.n);
+  const named = countries.filter((c) => c.name !== "Not stated");
   const buyers = [...items.reduce((m, n) => (n.buyer ? m.set(n.buyer, (m.get(n.buyer) ?? 0) + 1) : m), new Map<string, number>())].sort((a, b) => b[1] - a[1]).slice(0, 8);
   const srcs = [...new Set(items.map((n) => n.source))].map((k) => SOURCES[k]?.label ?? k);
-  const top = countries[0];
+  const top = named[0];
   const answer = items.length
-    ? `In the last 30 days Tender Atlas found ${items.length} public tenders classified under CPV ${division.code} (${division.name}), from ${srcs.join(", ")}. ${countries.length} ${countries.length === 1 ? "country" : "countries"} published them${top ? `, led by ${top.name} with ${top.n}` : ""}. ${open.length} still have a future deadline${valued.length ? `, and ${valued.length} state a value totalling about ${eur(total)} (indicative ECB conversion)` : ""}.`
+    ? `In the last 30 days Tender Atlas found ${items.length} public tenders classified under CPV ${division.code} (${division.name}), from ${srcs.join(", ")}. ${named.length ? `${named.length} ${named.length === 1 ? "country" : "countries"} published them${top ? `, led by ${top.name} with ${top.n}` : ""}.` : ""} ${open.length} still have a future deadline${valued.length ? `, and ${valued.length} state a value totalling about ${eur(total)} (indicative ECB conversion)` : ""}.`
     : `No CPV ${division.code} (${division.name}) notices were returned in the last 30 days from the sources we check. Set an alert to hear when new ones appear.`;
   const faq = [
     { q: `What is CPV code ${division.code}?`, a: `CPV (Common Procurement Vocabulary) is the EU classification used to describe public contracts. Division ${dv} covers ${division.name.toLowerCase()}; any CPV code starting with ${dv} belongs to it.` },
     { q: `How many ${division.name.toLowerCase()} tenders are open right now?`, a: answer },
-    { q: `Which countries publish the most CPV ${dv} tenders?`, a: countries.length ? countries.slice(0, 5).map((c) => `${c.name} (${c.n})`).join(", ") + ", based on notices from the last 30 days." : `None in the last 30 days from the sources we check.` },
+    { q: `Which countries publish the most CPV ${dv} tenders?`, a: named.length ? named.slice(0, 5).map((c) => `${c.name} (${c.n})`).join(", ") + ", based on notices from the last 30 days." : `None in the last 30 days from the sources we check.` },
     { q: `Where do these tender notices come from?`, a: `Official publication platforms: ${(["ted", "fr", "gr", "uk"] as const).map((k) => `${SOURCES[k].label} (${SOURCES[k].name})`).join("; ")}. Always confirm the deadline and documents on the official notice before bidding.` },
     { q: `How do I get alerts for new CPV ${dv} tenders?`, a: `Set up a Tender Atlas email alert for CPV division ${dv} (see the alerts page for options and pricing) to be notified when new matching notices are published.` },
   ];
@@ -38,7 +41,7 @@ export function CpvInsights({ division, items }: { division: { code: string; nam
       {countries.length > 0 && (
         <section className="mt-12"><h2 className="text-2xl font-semibold">{division.name} tenders by country (last 30 days)</h2>
           <div className="mt-4 overflow-x-auto rounded-xl border"><table className="w-full text-sm"><thead><tr className="text-left text-muted-foreground"><th className="p-3">Country</th><th className="p-3">Notices</th><th className="p-3">Open</th><th className="p-3">Stated value (EUR)</th></tr></thead>
-            <tbody>{countries.map((c) => <tr key={c.name} className="border-t"><td className="p-3 font-medium">{c.name}</td><td className="p-3">{c.n}</td><td className="p-3">{c.open}</td><td className="p-3">{c.value ? eur(c.value) : "—"}</td></tr>)}</tbody></table></div>
+            <tbody>{countries.map((c) => <tr key={c.name} className="border-t"><td className="p-3 font-medium">{c.iso2 ? <Link to="/countries/$code/cpv/$cpv" params={{ code: c.iso2, cpv: division.code }} className="hover:text-accent">{c.name}</Link> : c.name}</td><td className="p-3">{c.n}</td><td className="p-3">{c.open}</td><td className="p-3">{c.value ? eur(c.value) : "—"}</td></tr>)}</tbody></table></div>
         </section>
       )}
       {buyers.length > 0 && (

@@ -14,8 +14,8 @@ export const Route = createFileRoute("/cpv/$code")({
   },
   head: ({ loaderData, params }) => loaderData
     ? pageHead({
-        title: `${loaderData.division.name} tenders (CPV ${loaderData.division.code.slice(0, 2)})`,
-        description: `Public tenders classified under CPV ${loaderData.division.code} — ${loaderData.division.name} — published in the last 30 days across Europe.`,
+        title: `CPV code ${loaderData.division.code}: ${loaderData.division.name} tenders`,
+        description: `What CPV ${loaderData.division.code} covers, plus live ${loaderData.division.name.toLowerCase()} tenders from TED, Find a Tender, BOAMP and KIMDIS: open notices, values, countries and top buyers.`,
         path: `/cpv/${loaderData.division.code}`,
         noindex: loaderData.result.items.length < 5,
       })
@@ -28,7 +28,7 @@ function CpvPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <nav className="text-sm text-muted-foreground"><Link to="/cpv" className="hover:text-accent">Categories</Link> / CPV {division.code}</nav>
-      <h1 className="mt-2 text-4xl font-semibold">{division.name}</h1>
+      <h1 className="mt-2 text-4xl font-semibold">CPV {division.code}: {division.name}</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">Notices from TED, BOAMP, KIMDIS and Find a Tender whose CPV classification falls in division {division.code.slice(0, 2)}, published in the last 30 days.</p>
       <CpvInsights division={division} items={result.items} />
       <div className="mt-8 space-y-3"><TenderList items={result.items} /><SourceHealth result={result} /></div>
