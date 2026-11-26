@@ -35,5 +35,6 @@ use the editor.
 - Use Cloudflare D1 (`migrations/0001_directory.sql`, `src/lib/procurement/store.ts`) for the optional stored archive and fall back to live official-source search when it is absent or stale; never simulate stored data.
 - Never infer missing notice fields; show them as "not disclosed" — accuracy is the product.
 - Every source has an internal detail page; direct publisher links remain the authoritative record.
+- The sitemap is built from D1, stored in `site_cache` and rebuilt after each ingest (`src/lib/procurement/sitemap.ts`). When D1 fails it serves the last good copy or 503, never a shorter sitemap; and while D1 fails, tender, listing and buyer pages answer 503 instead of 404 or noindex (`src/lib/outage-guard.ts`). Keep both: an empty result must never stand in for a failed query.
 - Faceted /tenders URLs are noindex with canonical /tenders; country/CPV/country-CPV pages are noindex under 5 results — prevents thin/duplicate pages.
 - Saved tenders and searches stay in browser localStorage (`src/lib/workspace.ts`) until real accounts exist; dossier requests and confirmed alerts use owner-managed Cloudflare D1.

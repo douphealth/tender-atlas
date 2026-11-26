@@ -1,10 +1,11 @@
-import { setCfEnv } from "./lib/cf-env";
+import { cfBinding, setCfEnv } from "./lib/cf-env";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { seoPreflight, seoRewrite } from "./lib/seo-edge";
 import { withEdgeCache } from "./lib/edge-cache";
+import { databaseAnswers, guardOutage } from "./lib/outage-guard";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -53,10 +54,10 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async scheduled(event: { cron: string }, env: unknown, ctx: { waitUntil(promise: Promise<unknown>): void }) {
     setCfEnv(env);
-    const { ingestIncremental, sendDueAlerts } = await import("./lib/scheduled");
+    const { ingestIncremental, refreshSitemap, sendDueAlerts } = await import("./lib/scheduled");
     ctx.waitUntil((async () => {
       const environment = env as Parameters<typeof ingestIncremental>[0];
-      if (event.cron.startsWith("17")) await ingestIncremental(environment);
+      if (event.cron.startsWith("17")) { await ingestIncremental(environment); await refreshSitemap(environment); }
       else await sendDueAlerts(environment);
     })().catch((error) => console.error("Scheduled TenderAtlas job failed", error)));
   },
@@ -78,7 +79,9 @@ export default {
       }, async () => {
         const handler = await getServerEntry();
         const response = await handler.fetch(request, env, ctx);
-        return seoRewrite(request, await normalizeCatastrophicSsrResponse(response));
+        const page = seoRewrite(request, await normalizeCatastrophicSsrResponse(response));
+        // While the database is failing, "not found" and "noindex" on indexable pages go out as 503 (lib/outage-guard.ts).
+        return guardOutage(request, page, (fresh) => databaseAnswers(cfBinding("DB"), fresh));
       });
     } catch (error) {
       console.error(error);
