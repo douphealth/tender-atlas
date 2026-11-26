@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { normalize, parseSearch, type Notice } from "./sources";
-import { listStoredBuyers, storedSearch, upsertNotices, type D1Database, type D1Statement } from "./store";
+import { listStoredBuyers, relatedStored, storedSearch, upsertNotices, type D1Database, type D1Statement } from "./store";
 
 class SqlStatement implements D1Statement {
   private values: unknown[] = [];
@@ -14,9 +14,14 @@ class SqlStatement implements D1Statement {
   async run(): Promise<unknown> { return this.db.prepare(this.sql).run(...this.values as never[]); }
 }
 
-function memoryDb(): D1Database {
+const migrations = new URL("../../../migrations/", import.meta.url);
+function migratedSqlite(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
-  db.exec(readFileSync(new URL("../../../migrations/0001_directory.sql", import.meta.url), "utf8"));
+  for (const file of readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(file, migrations), "utf8"));
+  return db;
+}
+
+function memoryDb(db = migratedSqlite()): D1Database {
   return {
     prepare: (sql) => new SqlStatement(db, sql),
     batch: async (statements) => {
@@ -60,5 +65,26 @@ describe("stored directory search", () => {
     await upsertNotices(db, [notice("1-2026", "Road maintenance")]);
     await upsertNotices(db, [notice("1-2026", "Road maintenance updated")]);
     expect(await listStoredBuyers(db)).toEqual([expect.objectContaining({ name: "City Council", count: 1, open: 1, countries: 1 })]);
+  });
+});
+
+describe("D1 read cost", () => {
+  // D1 bills rows read; the free plan's daily cap is shared by every database on the account.
+  const plan = (db: DatabaseSync, sql: string) => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as { detail: string }[]).map((r) => r.detail).join(" | ");
+
+  it("serves the hot queries from indexes instead of scanning notices", () => {
+    const db = migratedSqlite();
+    expect(plan(db, "SELECT MAX(last_seen_at) AS fresh FROM notices")).toContain("notices_last_seen_idx");
+    expect(plan(db, `SELECT n.payload, n.value_eur FROM notices n WHERE n.country = 'FRA' AND n.status = 'open'
+      AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = '45') ORDER BY n.published_at DESC LIMIT 12`)).toContain("notices_country_idx (country=?)");
+    expect(plan(db, "SELECT COUNT(*) FROM notices n WHERE n.published_at >= '2026-01-01' AND n.source IN ('ted') AND n.country = 'FRA'"))
+      .toContain("notices_country_idx (country=? AND published_at>?)");
+  });
+
+  it("finds related open notices in the same country and CPV division", async () => {
+    const db = memoryDb();
+    await upsertNotices(db, [notice("1-2026", "Road maintenance"), { ...notice("2-2026", "Bridge repair"), buyer: "Other Council" }]);
+    const related = await relatedStored({ source: "ted", noticeId: "1-2026", buyer: null, country: "FRA", cpv: ["45000000"] }, db);
+    expect(related.map((n) => n.noticeId)).toEqual(["2-2026"]);
   });
 });

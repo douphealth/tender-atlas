@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cfBinding } from "@/lib/cf-env";
-import { cached } from "./cache";
+import { cached, sharedCached } from "./cache";
 import { fetchNotice, parseSearch, type SearchResult } from "./sources";
 import type { SourceKey } from "./catalog";
 import { relatedStored, searchWithStore, storedNotice, type AtlasEnv } from "./store";
@@ -15,7 +15,7 @@ export const searchTenders = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<SearchResult> => {
     const p = parseSearch(data);
     const only = Array.isArray(data.only) ? data.only : undefined;
-    return cached(`s:${JSON.stringify(p)}:${only?.join(",") ?? ""}`, 5 * 60_000, () => searchWithStore(p, env(), only));
+    return sharedCached(`s:${JSON.stringify(p)}:${only?.join(",") ?? ""}`, 10 * 60, () => searchWithStore(p, env(), only));
   });
 
 export const getTender = createServerFn({ method: "GET" })
