@@ -41,6 +41,8 @@ No Lovable service, account, database or AI gateway is used.
 
 The two cron expressions in the example run ingestion every six hours and confirmed alert digests daily.
 
+Each ingest also rebuilds the stored sitemap (`site_cache`, migration `0004_site_cache.sql`), so `/sitemap.xml` reads a few rows instead of scanning every notice. Its `X-Sitemap-Source` header says where the copy came from: `stored`, `rebuilt`, `stale` or `last-good` (the last two mean the database did not answer). If no trustworthy copy exists it answers 503 with `Retry-After`.
+
 ## Configuration
 
 Secrets are set with `bunx wrangler secret put NAME`; never commit them.

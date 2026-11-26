@@ -2,6 +2,7 @@ import { SOURCE_KEYS, SOURCES, type SourceKey } from "./catalog";
 import { collect, cpvPrefix, type Env, type Notice, type SearchParams, type SearchResult } from "./sources";
 import { officialEuroRates, toEur } from "./money";
 import { buyerSlug, reconcileNotices } from "./reconcile";
+import { sharedCached } from "./cache";
 
 export interface D1Statement {
   bind(...values: unknown[]): D1Statement;
@@ -27,11 +28,16 @@ const pageSize = 50;
 const json = (value: unknown) => JSON.stringify(value);
 const rowNotice = (row: { payload: string; value_eur?: number | null }): Notice => ({ ...JSON.parse(row.payload), valueEur: row.value_eur ?? null });
 
+// When each database was last found fresh, per isolate: the check runs before every stored search.
+const freshCheckedAt = new WeakMap<D1Database, number>();
 async function usableDb(db?: D1Database): Promise<D1Database | null> {
   if (!db) return null;
+  if (Date.now() - (freshCheckedAt.get(db) ?? 0) < 60_000) return db;
   try {
-    const row = await db.prepare("SELECT COUNT(*) AS count, MAX(last_seen_at) AS fresh FROM notices").first<{ count: number; fresh: string | null }>();
-    if (!row?.count || !row.fresh || Date.now() - Date.parse(row.fresh) > 26 * 60 * 60_000) return null;
+    // MAX over notices_last_seen_idx reads one row; an empty table gives null. (COUNT(*) read every row.)
+    const row = await db.prepare("SELECT MAX(last_seen_at) AS fresh FROM notices").first<{ fresh: string | null }>();
+    if (!row?.fresh || Date.now() - Date.parse(row.fresh) > 26 * 60 * 60_000) return null;
+    freshCheckedAt.set(db, Date.now());
     return db;
   } catch { return null; }
 }
@@ -94,12 +100,26 @@ export async function searchWithStore(p: SearchParams, env: AtlasEnv, only?: Sou
   return { ...live, storage: "live", total: Math.max(live.items.length, ...Object.values(live.health).map((h) => h?.total ?? 0)), pageSize: live.items.length || 50, hasNext: live.items.length >= 40 };
 }
 
-export async function storedNotice(source: string, id: string, db?: D1Database): Promise<Notice | null> {
+/** The stored notice, or null when there is none. Throws when D1 fails, so "absent" and "unknown" stay apart. */
+export async function lookupStoredNotice(source: string, id: string, db?: D1Database): Promise<Notice | null> {
   if (!db) return null;
-  try {
-    const row = await db.prepare("SELECT payload, value_eur FROM notices WHERE source = ? AND notice_id = ?").bind(source, id).first<{ payload: string; value_eur: number | null }>();
-    return row ? rowNotice(row) : null;
-  } catch { return null; }
+  const row = await db.prepare("SELECT payload, value_eur FROM notices WHERE source = ? AND notice_id = ?").bind(source, id).first<{ payload: string; value_eur: number | null }>();
+  return row ? rowNotice(row) : null;
+}
+
+export async function storedNotice(source: string, id: string, db?: D1Database): Promise<Notice | null> {
+  try { return await lookupStoredNotice(source, id, db); } catch { return null; }
+}
+
+/**
+ * A tender page's notice: the publisher's live record first, then the stored one. `known` is false when the
+ * live lookup found nothing and the database could not be asked, so the caller must not remember the miss.
+ */
+export async function resolveNotice(source: string, id: string, live: () => Promise<Notice | null>, db?: D1Database): Promise<{ notice: Notice | null; known: boolean }> {
+  const fresh = await live();
+  if (fresh) return { notice: fresh, known: true };
+  try { return { notice: await lookupStoredNotice(source, id, db), known: true }; }
+  catch { return { notice: null, known: false }; }
 }
 
 export async function upsertNotices(db: D1Database, notices: Notice[]): Promise<number> {
@@ -143,43 +163,39 @@ export async function ingestIncremental(env: AtlasEnv): Promise<{ stored: number
   return { stored, sources: report };
 }
 
+// The three sitemap queries throw when D1 fails. They used to return an empty result instead, which
+// published a sitemap without a single notice whenever the database was unavailable. See ./sitemap.ts.
 export async function sitemapNoticeRows(db?: D1Database): Promise<{ source: string; notice_id: string; updated_at: string | null; published_at: string | null }[]> {
   if (!db) return [];
-  try {
-    const rows = await db.prepare(`SELECT source, notice_id, updated_at, published_at FROM notices
-      WHERE title <> 'Untitled notice' AND buyer IS NOT NULL AND url IS NOT NULL
-        AND (deadline_at IS NOT NULL OR value IS NOT NULL OR cpv <> '[]')
-      ORDER BY COALESCE(updated_at, published_at) DESC LIMIT 50000`).all<{ source: string; notice_id: string; updated_at: string | null; published_at: string | null }>();
-    return rows.results;
-  } catch { return []; }
+  const rows = await db.prepare(`SELECT source, notice_id, updated_at, published_at FROM notices
+    WHERE title <> 'Untitled notice' AND buyer IS NOT NULL AND url IS NOT NULL
+      AND (deadline_at IS NOT NULL OR value IS NOT NULL OR cpv <> '[]')
+    ORDER BY COALESCE(updated_at, published_at) DESC, id LIMIT 50000`).all<{ source: string; notice_id: string; updated_at: string | null; published_at: string | null }>();
+  return rows.results;
 }
 
 export async function sitemapHubRows(db?: D1Database): Promise<{ country: string; division: string; lastmod: string | null }[]> {
   if (!db) return [];
-  try {
-    const rows = await db.prepare(`SELECT n.country AS country, substr(j.value, 1, 2) || '000000' AS division,
-      MAX(COALESCE(n.updated_at, n.published_at)) AS lastmod FROM notices n, json_each(n.cpv) j
-      WHERE n.country IS NOT NULL AND COALESCE(n.published_at, n.updated_at) >= date('now', '-30 days')
-      GROUP BY n.country, division HAVING COUNT(DISTINCT n.id) >= 5 LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
-    return rows.results;
-  } catch { return []; }
+  const rows = await db.prepare(`SELECT n.country AS country, substr(j.value, 1, 2) || '000000' AS division,
+    MAX(COALESCE(n.updated_at, n.published_at)) AS lastmod FROM notices n, json_each(n.cpv) j
+    WHERE n.country IS NOT NULL AND COALESCE(n.published_at, n.updated_at) >= date('now', '-30 days')
+    GROUP BY n.country, division HAVING COUNT(DISTINCT n.id) >= 5 ORDER BY n.country, division LIMIT 10000`).all<{ country: string; division: string; lastmod: string | null }>();
+  return rows.results;
 }
 
 /**
  * Countries (ISO3) and CPV divisions with at least 5 notices in the last 30 days: the same window and
- * threshold the country and CPV pages use before they allow indexing. Null when the store is unavailable.
+ * threshold the country and CPV pages use before they allow indexing. Null when no database is configured.
  */
 export async function sitemapListingCoverage(db?: D1Database): Promise<{ countries: Set<string>; divisions: Set<string> } | null> {
   if (!db) return null;
-  try {
-    const recent = `COALESCE(published_at, updated_at) >= date('now', '-30 days')`;
-    const [countries, divisions] = await Promise.all([
-      db.prepare(`SELECT country AS k FROM notices WHERE country IS NOT NULL AND ${recent} GROUP BY country HAVING COUNT(*) >= 5`).all<{ k: string }>(),
-      db.prepare(`SELECT substr(j.value, 1, 2) || '000000' AS k FROM notices n, json_each(n.cpv) j
-        WHERE ${recent.replace(/published_at|updated_at/g, (c) => `n.${c}`)} GROUP BY k HAVING COUNT(DISTINCT n.source || ':' || n.notice_id) >= 5`).all<{ k: string }>(),
-    ]);
-    return { countries: new Set(countries.results.map((r) => r.k)), divisions: new Set(divisions.results.map((r) => r.k)) };
-  } catch { return null; }
+  const recent = `COALESCE(published_at, updated_at) >= date('now', '-30 days')`;
+  const [countries, divisions] = await Promise.all([
+    db.prepare(`SELECT country AS k FROM notices WHERE country IS NOT NULL AND ${recent} GROUP BY country HAVING COUNT(*) >= 5`).all<{ k: string }>(),
+    db.prepare(`SELECT substr(j.value, 1, 2) || '000000' AS k FROM notices n, json_each(n.cpv) j
+      WHERE ${recent.replace(/published_at|updated_at/g, (c) => `n.${c}`)} GROUP BY k HAVING COUNT(DISTINCT n.source || ':' || n.notice_id) >= 5`).all<{ k: string }>(),
+  ]);
+  return { countries: new Set(countries.results.map((r) => r.k)), divisions: new Set(divisions.results.map((r) => r.k)) };
 }
 
 /**
@@ -201,11 +217,13 @@ export async function relatedStored(n: { source: string; noticeId: string; buyer
     }
     const division = n.cpv[0]?.slice(0, 2);
     if (out.length < limit && n.country) {
-      const rows = division
+      const country = n.country;
+      // Shared by every tender in the same country and division, so cache it across tender pages.
+      const rows = await sharedCached(`related:${country}:${division ?? ""}`, 3 * 3600, async () => (division
         ? await db.prepare(`SELECT n.payload, n.value_eur FROM notices n WHERE n.country = ? AND n.status = 'open'
-            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(n.country, division).all<{ payload: string; value_eur: number | null }>()
-        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(n.country).all<{ payload: string; value_eur: number | null }>();
-      take(rows.results);
+            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(country, division).all<{ payload: string; value_eur: number | null }>()
+        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(country).all<{ payload: string; value_eur: number | null }>()).results);
+      take(rows);
     }
     return out;
   } catch { return []; }
