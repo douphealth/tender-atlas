@@ -153,3 +153,48 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
+
+/* ---- Homepage ---- */
+@utility hero-wash {
+  background-image:
+    radial-gradient(56rem 30rem at 88% -12%, color-mix(in oklch, var(--accent) 17%, transparent), transparent 62%),
+    radial-gradient(48rem 26rem at -6% 112%, color-mix(in oklch, var(--chart-5) 16%, transparent), transparent 60%);
+}
+@utility ledger {
+  background-image: linear-gradient(155deg, var(--ink-deep), oklch(0.27 0.07 255));
+  box-shadow:
+    0 34px 60px -34px color-mix(in oklch, var(--ink-deep) 75%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 12%, transparent);
+}
+@utility live-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--success);
+  animation: live-pulse 2s ease-out infinite;
+}
+@utility lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 14px 28px -20px color-mix(in oklch, var(--ink-deep) 55%, transparent);
+  }
+}
+/* Transform only, so the panel never shifts layout or delays first paint. */
+@utility panel-rise {
+  animation: panel-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success) 60%, transparent); }
+  100% { box-shadow: 0 0 0 0.6rem transparent; }
+}
+@keyframes panel-rise {
+  from { transform: translateY(14px); }
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .panel-rise { animation: none; }
+  .lift, .lift:hover { transition: none; transform: none; }
+}
