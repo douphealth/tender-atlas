@@ -1,5 +1,10 @@
 import { SITE_URL } from "@/lib/site";
 
+/** How long a result read from the stored archive is reused. The archive changes only at the 6-hourly ingest. */
+export const STORED_TTL = 3 * 3600;
+/** How long a fallback result (live publishers, or "the database did not answer") is reused. */
+export const FALLBACK_TTL = 10 * 60;
+
 // Small per-isolate memo cache so repeated page views don't hammer official publishers.
 const store = new Map<string, { at: number; value: unknown }>();
 // `ttlMs` may depend on the value, so a miss ("not found") can be kept for less time than a hit.
@@ -20,12 +25,15 @@ type CacheStorageCF = { default: Cache };
 /**
  * cached() plus Cloudflare's Cache API, which every isolate in a data centre shares. Isolates are short-lived,
  * so with the memo alone most crawler hits re-ran their D1 queries, and D1 bills rows read (the free plan caps
- * them per account per day). The stored archive only changes when the 6-hourly ingest runs, so minutes of
- * staleness cost nothing. Values must be JSON-serialisable; null/undefined are not stored at the edge.
+ * them per account per day, across every database on the account). The stored archive only changes when the
+ * 6-hourly ingest runs, so results read from it are kept for hours (STORED_TTL). Values must be JSON-serialisable; null/undefined are not stored at the edge.
  * Where the Cache API is unavailable (tests, local dev, *.pages.dev) this is the memo alone.
  */
-export async function sharedCached<T>(key: string, ttlSec: number, fn: () => Promise<T>): Promise<T> {
-  return cached(key, ttlSec * 1000, async () => {
+export async function sharedCached<T>(key: string, ttlSec: number | ((value: T) => number), fn: () => Promise<T>): Promise<T> {
+  // A function lets a result read from the stored archive be kept for hours while a fallback result
+  // (the database did not answer) is kept for minutes, so recovery is never masked by a long-lived fallback.
+  const seconds = (value: T) => (typeof ttlSec === "function" ? ttlSec(value) : ttlSec);
+  return cached(key, (value: T) => seconds(value) * 1000, async () => {
     const cache = (globalThis as unknown as { caches?: CacheStorageCF }).caches?.default;
     if (!cache) return fn();
     // Our own origin keeps the entry in this zone's cache; the path is never served as a page.
@@ -35,9 +43,10 @@ export async function sharedCached<T>(key: string, ttlSec: number, fn: () => Pro
       if (hit) return (await hit.json()) as T;
     } catch { /* cache unavailable: compute normally */ }
     const value = await fn();
-    if (value != null) {
+    const keep = value != null ? Math.floor(seconds(value)) : 0;
+    if (keep > 0) {
       await cache.put(req, new Response(JSON.stringify(value), {
-        headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttlSec}` },
+        headers: { "content-type": "application/json", "cache-control": `public, max-age=${keep}` },
       })).catch(() => undefined);
     }
     return value;

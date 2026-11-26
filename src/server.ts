@@ -68,11 +68,13 @@ export default {
     const redirect = seoPreflight(request);
     if (redirect) return redirect;
     try {
-      // Public pages: listings fresh for 5 min, notices (which rarely change) and the sitemap for 1 h; after that the
-      // cached copy is served instantly while re-rendering in the background. See lib/edge-cache.ts.
+      // Public pages: listings fresh for 30 min (the archive changes only at the 6-hourly ingest), notices and the
+      // sitemap for 1 h; after that the cached copy is served instantly while re-rendering in the background, and
+      // for a further week it is served if a fresh render fails. See lib/edge-cache.ts.
       return await withEdgeCache(request, ctx, {
-        ttl: 300,
-        swr: 3600,
+        ttl: 1800,
+        swr: 6 * 3600,
+        sie: 7 * 86400,
         ttlFor: (p) => (p.startsWith("/tenders/") ? { ttl: 3600, swr: 86400 }
           : p === "/sitemap.xml" ? { ttl: 3600, swr: 21600 } : null),
         skip: (p) => /^\/(api|app|alerts)(\/|$)/.test(p),

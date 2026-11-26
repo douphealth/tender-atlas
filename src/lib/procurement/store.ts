@@ -2,7 +2,7 @@ import { SOURCE_KEYS, SOURCES, type SourceKey } from "./catalog";
 import { collect, cpvPrefix, type Env, type Notice, type SearchParams, type SearchResult } from "./sources";
 import { officialEuroRates, toEur } from "./money";
 import { buyerSlug, reconcileNotices } from "./reconcile";
-import { sharedCached } from "./cache";
+import { sharedCached, STORED_TTL } from "./cache";
 
 export interface D1Statement {
   bind(...values: unknown[]): D1Statement;
@@ -132,9 +132,14 @@ export async function upsertNotices(db: D1Database, notices: Notice[]): Promise<
   ON CONFLICT(id) DO UPDATE SET title=excluded.title, description=excluded.description, buyer=excluded.buyer, buyer_slug=excluded.buyer_slug,
     country=excluded.country, published_at=excluded.published_at, updated_at=excluded.updated_at,
     deadline_at=excluded.deadline_at, value=excluded.value, currency=excluded.currency, value_eur=excluded.value_eur,
-    cpv=excluded.cpv, status=excluded.status, url=excluded.url, payload=excluded.payload, last_seen_at=excluded.last_seen_at`)
+    cpv=excluded.cpv, status=excluded.status, url=excluded.url, payload=excluded.payload, last_seen_at=excluded.last_seen_at
+  WHERE excluded.payload IS NOT notices.payload OR excluded.value_eur IS NOT notices.value_eur`)
     .bind(n.id, n.source, n.noticeId, n.title, n.description, n.buyer, n.buyer ? buyerSlug(n.buyer) : null, n.country, n.publishedAt, n.updatedAt, n.deadlineAt, n.value, n.currency, n.valueEur ?? null, json(n.cpv), n.status, n.url, json(n), now));
   for (let i = 0; i < statements.length; i += 50) await db.batch(statements.slice(i, i + 50));
+  // An unchanged notice is not rewritten: the ingest re-reads the same 7-day window four times a day, and every
+  // rewrite also rewrote seven indexes and the full-text entry (D1 caps rows written per day on the free plan).
+  // Freshness is therefore stamped on one row; usableDb() and the outage guard read MAX(last_seen_at).
+  await db.prepare("UPDATE notices SET last_seen_at = ? WHERE id = ?").bind(now, notices[0]!.id).run();
   return notices.length;
 }
 
@@ -198,6 +203,9 @@ export async function sitemapListingCoverage(db?: D1Database): Promise<{ countri
   return { countries: new Set(countries.results.map((r) => r.k)), divisions: new Set(divisions.results.map((r) => r.k)) };
 }
 
+/** Newest open notices read per country for "Related tenders". */
+export const RELATED_POOL = 100;
+
 /**
  * Up to `limit` stored notices related to one tender: other notices from the same buyer first, then
  * open notices in the same country and CPV division. Excludes the tender itself. Empty when D1 is unavailable.
@@ -218,12 +226,13 @@ export async function relatedStored(n: { source: string; noticeId: string; buyer
     const division = n.cpv[0]?.slice(0, 2);
     if (out.length < limit && n.country) {
       const country = n.country;
-      // Shared by every tender in the same country and division, so cache it across tender pages.
-      const rows = await sharedCached(`related:${country}:${division ?? ""}`, 3 * 3600, async () => (division
-        ? await db.prepare(`SELECT n.payload, n.value_eur FROM notices n WHERE n.country = ? AND n.status = 'open'
-            AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = ?) ORDER BY n.published_at DESC LIMIT 12`).bind(country, division).all<{ payload: string; value_eur: number | null }>()
-        : await db.prepare("SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT 12").bind(country).all<{ payload: string; value_eur: number | null }>()).results);
-      take(rows);
+      // One bounded read per country, shared by every tender page of that country; the CPV division is matched
+      // here. The earlier per-division query walked a whole country's notices whenever a division was rare,
+      // once for each of the ~1,300 country x division pairs.
+      const rows = await sharedCached(`open:${country}`, STORED_TTL, async () => (await db.prepare(
+        "SELECT payload, value_eur FROM notices WHERE country = ? AND status = 'open' ORDER BY published_at DESC LIMIT ?")
+        .bind(country, RELATED_POOL).all<{ payload: string; value_eur: number | null }>()).results);
+      take(division ? rows.filter((r) => rowNotice(r).cpv.some((code) => code.slice(0, 2) === division)) : rows);
     }
     return out;
   } catch { return []; }

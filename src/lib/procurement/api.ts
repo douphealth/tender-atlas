@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cfBinding } from "@/lib/cf-env";
-import { cached, sharedCached } from "./cache";
+import { cached, FALLBACK_TTL, sharedCached, STORED_TTL } from "./cache";
 import { fetchNotice, parseSearch, type SearchResult } from "./sources";
 import type { SourceKey } from "./catalog";
 import { relatedStored, resolveNotice, searchWithStore, type AtlasEnv } from "./store";
@@ -15,7 +15,8 @@ export const searchTenders = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<SearchResult> => {
     const p = parseSearch(data);
     const only = Array.isArray(data.only) ? data.only : undefined;
-    return sharedCached(`s:${JSON.stringify(p)}:${only?.join(",") ?? ""}`, 10 * 60, () => searchWithStore(p, env(), only));
+    // Stored results are reused until well into the next ingest window; a live fallback only for minutes.
+    return sharedCached(`s:${JSON.stringify(p)}:${only?.join(",") ?? ""}`, (r: SearchResult) => (r.storage === "database" ? STORED_TTL : FALLBACK_TTL), () => searchWithStore(p, env(), only));
   });
 
 export const getTender = createServerFn({ method: "GET" })
