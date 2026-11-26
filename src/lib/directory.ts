@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { cfBinding } from "@/lib/cf-env";
-import { cached } from "./procurement/cache";
+import { cached, sharedCached, STORED_TTL } from "./procurement/cache";
 import { listStoredBuyers, storedBuyer, type AtlasEnv, type BuyerProfile, type BuyerSummary } from "./procurement/store";
 import { collect } from "./procurement/sources";
 import { buyerSlug } from "./procurement/reconcile";
@@ -22,14 +22,16 @@ async function liveBuyers(): Promise<BuyerSummary[]> {
 }
 
 export const getBuyers = createServerFn({ method: "GET" }).handler(async () => {
-  const stored = await listStoredBuyers(env().DB);
+  // A whole-table GROUP BY: read once per data centre between ingests, not on every crawler hit. A failed read
+  // (null) is retried after a minute.
+  const stored = await sharedCached<BuyerSummary[] | null>("buyers:stored", (v) => (v ? STORED_TTL : 60), () => listStoredBuyers(env().DB));
   return { items: stored ?? await liveBuyers(), storage: stored ? "database" as const : "live" as const };
 });
 
 export const getBuyer = createServerFn({ method: "GET" })
   .inputValidator((input: { slug: string }) => ({ slug: String(input.slug).slice(0, 100) }))
   .handler(async ({ data }): Promise<{ profile: BuyerProfile | null; storage: "database" | "live" }> => {
-    const stored = await storedBuyer(data.slug, env().DB);
+    const stored = await sharedCached<BuyerProfile | null>(`buyer:stored:${data.slug}`, (v) => (v ? STORED_TTL : 60), () => storedBuyer(data.slug, env().DB));
     if (stored) return { profile: stored, storage: "database" };
     const buyers = await liveBuyers();
     const summary = buyers.find((b) => b.slug === data.slug);

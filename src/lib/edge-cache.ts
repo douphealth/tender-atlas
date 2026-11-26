@@ -2,6 +2,7 @@
 // A page younger than `ttl` is served as is. Between `ttl` and `ttl + swr` the cached copy is served
 // immediately and re-rendered in the background, so visitors and crawlers almost never wait for a
 // full render. Only anonymous GET requests for HTML or XML that rendered with 200 and set no cookie are stored.
+// Past `ttl + swr` a copy is kept `sie` seconds more, and served only if the fresh render fails (5xx).
 
 // Unique per build (vite.config.ts `define`). Part of the cache key, so a deploy never serves HTML that
 // points at the previous build's JS/CSS files (Pages keeps only the current deployment's assets).
@@ -10,7 +11,7 @@ const BUILD = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 
 type Ctx = { waitUntil?(p: Promise<unknown>): void } | undefined;
 type CacheStorageCF = { default: Cache };
-type Opts = { ttl: number; swr?: number; skip?: (path: string) => boolean; ttlFor?: (path: string) => { ttl: number; swr?: number } | null };
+type Opts = { ttl: number; swr?: number; sie?: number; skip?: (path: string) => boolean; ttlFor?: (path: string) => { ttl: number; swr?: number } | null };
 
 export async function withEdgeCache(request: Request, ctx: unknown, opts: Opts, render: () => Promise<Response>): Promise<Response> {
   const cache = (globalThis as unknown as { caches?: CacheStorageCF }).caches?.default;
@@ -19,6 +20,10 @@ export async function withEdgeCache(request: Request, ctx: unknown, opts: Opts, 
     return render();
   }
   const { ttl, swr = 0 } = opts.ttlFor?.(url.pathname) ?? opts;
+  // Stale-if-error: a copy older than ttl + swr is kept `sie` seconds longer and served only when a fresh
+  // render fails (5xx), so a database or publisher outage does not turn already-rendered pages into errors.
+  const sie = opts.sie ?? 0;
+  let expired: Response | undefined;
   const keyUrl = new URL(url);
   keyUrl.searchParams.set("__build", BUILD);
   const key = new Request(keyUrl.toString(), { method: "GET" });
@@ -29,7 +34,7 @@ export async function withEdgeCache(request: Request, ctx: unknown, opts: Opts, 
     // HTML pages plus XML feeds (sitemap, RSS), whose D1 queries ran on every crawler fetch.
     if (response.status !== 200 || !/text\/html|xml/.test(type) || response.headers.has("set-cookie")) return;
     const stored = new Response(response.body, response);
-    stored.headers.set("cache-control", `public, max-age=${ttl + swr}`);
+    stored.headers.set("cache-control", `public, max-age=${ttl + swr + sie}`);
     stored.headers.set("x-cached-at", String(Date.now()));
     await cache.put(key, stored).catch(() => undefined);
   };
@@ -50,10 +55,15 @@ export async function withEdgeCache(request: Request, ctx: unknown, opts: Opts, 
         c.waitUntil(render().then(store).catch(() => undefined)); // refresh for the next visitor
         return res;
       }
+      if (age < ttl + swr + sie) expired = res;
     }
   } catch { /* cache unavailable: render normally */ }
 
   const response = await render();
+  if (response.status >= 500 && expired) {
+    expired.headers.set("x-edge-cache", "STALE-IF-ERROR");
+    return expired;
+  }
   const toStore = response.clone();
   const put = store(toStore);
   if (c?.waitUntil) c.waitUntil(put); else await put;

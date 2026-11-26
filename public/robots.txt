@@ -2,5 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /app
+# Filtered and paginated searches are noindex with canonical /tenders; each one costs a database scan.
+Disallow: /tenders?
 
 Sitemap: https://tenderatlas.shop/sitemap.xml

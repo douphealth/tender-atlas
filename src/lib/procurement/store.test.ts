@@ -75,8 +75,8 @@ describe("D1 read cost", () => {
   it("serves the hot queries from indexes instead of scanning notices", () => {
     const db = migratedSqlite();
     expect(plan(db, "SELECT MAX(last_seen_at) AS fresh FROM notices")).toContain("notices_last_seen_idx");
-    expect(plan(db, `SELECT n.payload, n.value_eur FROM notices n WHERE n.country = 'FRA' AND n.status = 'open'
-      AND EXISTS (SELECT 1 FROM json_each(n.cpv) j WHERE substr(j.value, 1, 2) = '45') ORDER BY n.published_at DESC LIMIT 12`)).toContain("notices_country_idx (country=?)");
+    expect(plan(db, "SELECT payload, value_eur FROM notices WHERE country = 'FRA' AND status = 'open' ORDER BY published_at DESC LIMIT 100"))
+      .toContain("notices_country_idx (country=?)");
     expect(plan(db, "SELECT COUNT(*) FROM notices n WHERE n.published_at >= '2026-01-01' AND n.source IN ('ted') AND n.country = 'FRA'"))
       .toContain("notices_country_idx (country=? AND published_at>?)");
   });
@@ -86,5 +86,34 @@ describe("D1 read cost", () => {
     await upsertNotices(db, [notice("1-2026", "Road maintenance"), { ...notice("2-2026", "Bridge repair"), buyer: "Other Council" }]);
     const related = await relatedStored({ source: "ted", noticeId: "1-2026", buyer: null, country: "FRA", cpv: ["45000000"] }, db);
     expect(related.map((n) => n.noticeId)).toEqual(["2-2026"]);
+  });
+
+  it("matches the CPV division inside one bounded per-country read", async () => {
+    const db = memoryDb();
+    const other = (id: string, cpv: string[]): Notice => ({ ...notice(id, `Notice ${id}`), buyer: `Buyer ${id}`, country: "DEU", cpv });
+    await upsertNotices(db, [other("10-2026", ["45000000"]), other("11-2026", ["33000000"]), other("12-2026", ["45200000"]), other("13-2026", ["72000000"])]);
+    const related = await relatedStored({ source: "ted", noticeId: "10-2026", buyer: null, country: "DEU", cpv: ["45000000"] }, db);
+    expect(related.map((n) => n.noticeId)).toEqual(["12-2026"]);
+  });
+
+  it("does not rewrite an unchanged notice on re-ingest, and still stamps the ingest time", async () => {
+    const raw = migratedSqlite();
+    const db = memoryDb(raw);
+    const seen = (id: string) => (raw.prepare("SELECT last_seen_at AS at FROM notices WHERE notice_id = ?").get(id) as { at: string }).at;
+    const [a, b] = [notice("1-2026", "Road maintenance"), { ...notice("2-2026", "Bridge repair"), buyer: "Other Council" }];
+    await upsertNotices(db, [a, b]);
+    const first = seen("2-2026");
+    await new Promise((r) => setTimeout(r, 5));
+    const before = (raw.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+    await upsertNotices(db, [a, b]);
+    const changes = (raw.prepare("SELECT total_changes() AS n").get() as { n: number }).n - before;
+    expect(seen("2-2026")).toBe(first); // untouched
+    expect(seen("1-2026") > first).toBe(true); // the one-row freshness stamp
+    // A real change is still written, and costs what the unchanged re-ingest no longer does.
+    const mark = (raw.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+    await upsertNotices(db, [{ ...a, title: "Road maintenance and marking" }, { ...b, title: "Bridge repair and painting" }]);
+    const rewrite = (raw.prepare("SELECT total_changes() AS n").get() as { n: number }).n - mark;
+    expect((await storedSearch(parseSearch({ q: "painting" }), db))?.total).toBe(1);
+    expect(changes * 2).toBeLessThan(rewrite); // only the one-row stamp (and its full-text entry) was written
   });
 });
